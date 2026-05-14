@@ -1,7 +1,7 @@
 {
-  "name": "thinkdesk",
-  "private": true,
+  "name": "CodeX-UI-Template",
   "version": "0.0.0",
+  "license": "MIT",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {

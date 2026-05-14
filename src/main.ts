@@ -10,13 +10,13 @@ const ICON_THEME = `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke=
 const ICON_SETTINGS = `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`
 
 function readStoredTheme(): 'dark' | 'light' | null {
-  const v = localStorage.getItem('thinkdesk-theme')
+  const v = localStorage.getItem('CodeX-UI-Template-theme')
   return v === 'dark' || v === 'light' ? v : null
 }
 
 function applyTheme(theme: 'dark' | 'light') {
   document.documentElement.dataset.theme = theme
-  localStorage.setItem('thinkdesk-theme', theme)
+  localStorage.setItem('CodeX-UI-Template-theme', theme)
 }
 
 function initTheme() {
@@ -59,13 +59,13 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
             <button type="button" class="btn btn-toolbar" id="btn-theme" title="切换浅色 / 深色" aria-label="切换主题">
               ${ICON_THEME}
             </button>
-            <span class="user-select-none text-token-secondary" style="font-size:10px">ThinkDesk</span>
+            <span class="user-select-none text-token-secondary" style="font-size:10px">CodeX-UI-Template</span>
           </div>
         </footer>
       </aside>
       <div class="app-workspace">
         <header class="app-workspace-header" role="banner">
-          <span class="app-workspace-title no-drag" id="workspace-title">欢迎使用 ThinkDesk</span>
+          <span class="app-workspace-title no-drag" id="workspace-title">欢迎使用 CodeX-UI-Template</span>
           <div class="app-workspace-drag-gap draggable" aria-hidden="true"></div>
           <div class="app-workspace-actions no-drag">
             <span class="status-pill user-select-none" id="ipc-status" title="主进程推送">等待连接…</span>
@@ -74,7 +74,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <main class="app-main" role="main">
           <div class="app-main-inner">
             <div class="app-main-eyebrow" id="main-eyebrow">概览</div>
-            <h1 class="app-main-heading" id="main-heading">欢迎使用 ThinkDesk</h1>
+            <h1 class="app-main-heading" id="main-heading">欢迎使用 CodeX-UI-Template</h1>
             <section class="app-panel" id="panel-home">
               <div class="app-logos">
                 <a href="https://electron-vite.github.io" target="_blank" rel="noreferrer">
@@ -124,7 +124,7 @@ const panelDocs = document.getElementById('panel-docs')!
 const panelSettings = document.getElementById('panel-settings')!
 
 const viewMeta: Record<string, { eyebrow: string; heading: string }> = {
-  home: { eyebrow: '概览', heading: '欢迎使用 ThinkDesk' },
+  home: { eyebrow: '概览', heading: '欢迎使用 CodeX-UI-Template' },
   docs: { eyebrow: '文档', heading: '文档' },
   settings: { eyebrow: '设置', heading: '设置' },
 }
