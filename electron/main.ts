@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, nativeTheme } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -24,6 +24,10 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 
 let win: BrowserWindow | null
 
+function getWindowBackgroundColor() {
+  return nativeTheme.shouldUseDarkColors ? '#181818' : '#f9f9f9'
+}
+
 function createWindow() {
   const isMac = process.platform === 'darwin'
 
@@ -32,7 +36,7 @@ function createWindow() {
     height: 720,
     minWidth: 640,
     minHeight: 480,
-    backgroundColor: '#181818',
+    backgroundColor: isMac ? '#00000000' : getWindowBackgroundColor(),
     icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
@@ -48,6 +52,16 @@ function createWindow() {
         }
       : {}),
   })
+
+  if (!isMac) {
+    const syncBackgroundColor = () => {
+      win?.setBackgroundColor(getWindowBackgroundColor())
+    }
+    nativeTheme.on('updated', syncBackgroundColor)
+    win.on('closed', () => {
+      nativeTheme.off('updated', syncBackgroundColor)
+    })
+  }
 
   // Test active push message to Renderer-process.
   win.webContents.on('did-finish-load', () => {
@@ -80,4 +94,7 @@ app.on('activate', () => {
   }
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  nativeTheme.themeSource = 'system'
+  createWindow()
+})

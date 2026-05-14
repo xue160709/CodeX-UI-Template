@@ -1,84 +1,4 @@
-/* ========== Primitive tokens（笔记 §7.1） ========== */
-:root {
-  --gray-0: #ffffff;
-  --gray-50: #f9f9f9;
-  --gray-100: #ededed;
-  --gray-200: #e0e0e0;
-  --gray-400: #8e8e8e;
-  --gray-500: #5d5d5d;
-  --gray-700: #3a3a3a;
-  --gray-800: #2a2a2a;
-  --gray-900: #181818;
-
-  --blue-400: #0285ff;
-  --blue-500: #0066cc;
-
-  --spacing: 0.25rem;
-
-  --text-xs: 11px;
-  --text-sm: 12px;
-  --text-base: 14px;
-  --text-lg: 16px;
-
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-workspace: 16px;
-
-  --height-toolbar: 46px;
-  --height-toolbar-sm: 36px;
-  --height-toolbar-pane: 40px;
-  --spacing-token-safe-header-left: 0px;
-  --spacing-token-safe-header-right: 0px;
-  --spacing-token-safe-header-top: 0px;
-  --padding-panel: calc(var(--spacing) * 3);
-  --padding-toolbar: calc(var(--spacing) * 2);
-  --width-sidebar: 240px;
-  --width-sidebar-min: 240px;
-  --width-sidebar-collapsed: 0px;
-  --width-chrome-toolbar: 108px;
-  --size-chrome-control: 32px;
-  --sidebar-glass-blur: 28px;
-
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    'Noto Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
-}
-
-/* ========== Semantic tokens（笔记 §7.2） ========== */
-:root,
-[data-theme='dark'] {
-  color-scheme: dark;
-  --color-token-main-surface-primary: var(--gray-900);
-  --color-token-foreground: var(--gray-0);
-  --color-token-text-primary: color-mix(in oklab, var(--gray-0) 92%, transparent);
-  --color-token-text-secondary: color-mix(in oklab, var(--gray-0) 58%, transparent);
-  --color-token-border: color-mix(in oklab, var(--gray-0) 12%, transparent);
-  --color-token-button-background: color-mix(in oklab, var(--gray-0) 8%, transparent);
-  --color-token-input-background: color-mix(in oklab, var(--gray-0) 6%, transparent);
-  --color-token-list-hover-background: color-mix(in oklab, var(--gray-0) 8%, transparent);
-  --codex-titlebar-tint: color-mix(in oklab, var(--gray-900) 88%, transparent);
-  --color-focus-border: var(--blue-400);
-  --color-token-sidebar-glass-surface: color-mix(in oklab, var(--gray-800) 36%, transparent);
-  --color-token-sidebar-glass-fallback: color-mix(in oklab, var(--gray-800) 94%, var(--gray-900));
-  --color-token-sidebar-edge-border: color-mix(in oklab, var(--gray-0) 12%, transparent);
-}
-
-[data-theme='light'] {
-  color-scheme: light;
-  --color-token-main-surface-primary: var(--gray-50);
-  --color-token-foreground: var(--gray-900);
-  --color-token-text-primary: var(--gray-900);
-  --color-token-text-secondary: color-mix(in oklab, var(--gray-900) 58%, transparent);
-  --color-token-border: color-mix(in oklab, var(--gray-900) 10%, transparent);
-  --color-token-button-background: var(--gray-100);
-  --color-token-input-background: var(--gray-0);
-  --color-token-list-hover-background: color-mix(in oklab, var(--gray-900) 6%, transparent);
-  --codex-titlebar-tint: color-mix(in oklab, var(--gray-0) 72%, transparent);
-  --color-token-sidebar-glass-surface: color-mix(in oklab, var(--gray-0) 48%, transparent);
-  --color-token-sidebar-glass-fallback: color-mix(in oklab, var(--gray-0) 92%, var(--gray-50));
-  --color-token-sidebar-edge-border: color-mix(in oklab, var(--gray-900) 10%, transparent);
-}
+@import './theme/tokens.css';
 
 *,
 *::before,
@@ -302,14 +222,6 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-}
-
-html[data-window-effects='mac-vibrancy'][data-theme='light'] .app-sidebar {
-  background: transparent;
-}
-
-html[data-window-effects='mac-vibrancy'][data-theme='light'] .app-body {
-  background: transparent;
 }
 
 .app-sidebar-scroll {

@@ -6,28 +6,7 @@ import { applySafeAreaToDocument, installWindowSafeAreaListeners } from './windo
 const ICON_SIDEBAR = `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h10M4 18h16"/></svg>`
 const ICON_BACK = `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6"/></svg>`
 const ICON_FORWARD = `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="transform:scaleX(-1)"><path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6"/></svg>`
-const ICON_THEME = `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707"/></svg>`
 const ICON_SETTINGS = `<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`
-
-function readStoredTheme(): 'dark' | 'light' | null {
-  const v = localStorage.getItem('CodeX-UI-Template-theme')
-  return v === 'dark' || v === 'light' ? v : null
-}
-
-function applyTheme(theme: 'dark' | 'light') {
-  document.documentElement.dataset.theme = theme
-  localStorage.setItem('CodeX-UI-Template-theme', theme)
-}
-
-function initTheme() {
-  const stored = readStoredTheme()
-  if (stored) {
-    applyTheme(stored)
-    return
-  }
-  const prefersLight = window.matchMedia?.('(prefers-color-scheme: light)').matches
-  applyTheme(prefersLight ? 'light' : 'dark')
-}
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div class="app-shell" id="app-shell">
@@ -55,12 +34,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
           <button type="button" class="btn btn-toolbar" id="btn-footer-settings" title="设置" aria-label="设置">
             ${ICON_SETTINGS}
           </button>
-          <div class="flex items-center gap-1">
-            <button type="button" class="btn btn-toolbar" id="btn-theme" title="切换浅色 / 深色" aria-label="切换主题">
-              ${ICON_THEME}
-            </button>
-            <span class="user-select-none text-token-secondary" style="font-size:10px">CodeX-UI-Template</span>
-          </div>
+          <span class="user-select-none text-token-secondary" style="font-size:10px">CodeX-UI-Template</span>
         </footer>
       </aside>
       <div
@@ -114,15 +88,13 @@ if (window.desktop?.windowEffects?.macVibrancy) {
   document.documentElement.dataset.windowEffects = 'mac-vibrancy'
 }
 
-initTheme()
-
 const shell = document.getElementById('app-shell')!
 const appBody = document.querySelector<HTMLElement>('.app-body')!
+const appSidebar = document.querySelector<HTMLElement>('.app-sidebar')!
 const sidebarSplitter = document.getElementById('app-sidebar-splitter')!
 const btnToggleSidebar = document.getElementById('btn-toggle-sidebar')!
 const btnBack = document.getElementById('btn-back') as HTMLButtonElement
 const btnForward = document.getElementById('btn-forward') as HTMLButtonElement
-const btnTheme = document.getElementById('btn-theme')!
 const btnFooterSettings = document.getElementById('btn-footer-settings')!
 const ipcStatus = document.getElementById('ipc-status')!
 const workspaceTitle = document.getElementById('workspace-title')!
@@ -202,9 +174,7 @@ sidebarSplitter.addEventListener('pointerdown', (e) => {
   sidebarResizeActive = true
   shell.classList.add('is-resizing-sidebar')
   const startX = e.clientX
-  const cs = getComputedStyle(appBody)
-  const currentRaw = cs.getPropertyValue('--sidebar-current-width').trim()
-  const startWidth = Number.parseFloat(currentRaw) || readCssPxVar('--width-sidebar', 240)
+  const startWidth = appSidebar.getBoundingClientRect().width || readCssPxVar('--width-sidebar-min', 240)
   const onMove = (ev: PointerEvent) => {
     if (!sidebarResizeActive) return
     const dx = ev.clientX - startX
@@ -236,11 +206,6 @@ window.addEventListener('resize', () => {
 
 btnToggleSidebar.addEventListener('click', () => {
   shell.classList.toggle('is-sidebar-collapsed')
-})
-
-btnTheme.addEventListener('click', () => {
-  const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'
-  applyTheme(next)
 })
 
 btnFooterSettings.addEventListener('click', () => {
