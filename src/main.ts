@@ -63,6 +63,13 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
           </div>
         </footer>
       </aside>
+      <div
+        class="app-sidebar-splitter no-drag"
+        id="app-sidebar-splitter"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整侧栏宽度"
+      ></div>
       <div class="app-workspace">
         <header class="app-workspace-header" role="banner">
           <span class="app-workspace-title no-drag" id="workspace-title">欢迎使用 CodeX-UI-Template</span>
@@ -110,6 +117,8 @@ if (window.desktop?.windowEffects?.macVibrancy) {
 initTheme()
 
 const shell = document.getElementById('app-shell')!
+const appBody = document.querySelector<HTMLElement>('.app-body')!
+const sidebarSplitter = document.getElementById('app-sidebar-splitter')!
 const btnToggleSidebar = document.getElementById('btn-toggle-sidebar')!
 const btnBack = document.getElementById('btn-back') as HTMLButtonElement
 const btnForward = document.getElementById('btn-forward') as HTMLButtonElement
@@ -146,6 +155,83 @@ btnBack.addEventListener('click', () => {
 
 btnForward.addEventListener('click', () => {
   window.history.forward()
+})
+
+const SIDEBAR_WIDTH_STORAGE_KEY = 'CodeX-UI-Template-sidebar-width-px'
+const SIDEBAR_MAX_RATIO = 0.3
+
+function readCssPxVar(name: string, fallback: number): number {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  const n = Number.parseFloat(raw)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function clampSidebarWidth(px: number): number {
+  const min = readCssPxVar('--width-sidebar-min', 160)
+  const bodyW = appBody.getBoundingClientRect().width
+  const max = Math.max(min, bodyW * SIDEBAR_MAX_RATIO)
+  return Math.min(max, Math.max(min, px))
+}
+
+function applySidebarWidthPx(px: number) {
+  const clamped = clampSidebarWidth(px)
+  appBody.style.setProperty('--sidebar-user-width', `${clamped}px`)
+  try {
+    localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(Math.round(clamped)))
+  } catch {
+    /* ignore */
+  }
+}
+
+function initSidebarWidthFromStorage() {
+  const raw = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY)
+  if (!raw) return
+  const n = Number.parseInt(raw, 10)
+  if (!Number.isFinite(n)) return
+  applySidebarWidthPx(n)
+}
+
+initSidebarWidthFromStorage()
+
+let sidebarResizeActive = false
+
+sidebarSplitter.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return
+  if (shell.classList.contains('is-sidebar-collapsed')) return
+  e.preventDefault()
+  sidebarResizeActive = true
+  shell.classList.add('is-resizing-sidebar')
+  const startX = e.clientX
+  const cs = getComputedStyle(appBody)
+  const currentRaw = cs.getPropertyValue('--sidebar-current-width').trim()
+  const startWidth = Number.parseFloat(currentRaw) || readCssPxVar('--width-sidebar', 240)
+  const onMove = (ev: PointerEvent) => {
+    if (!sidebarResizeActive) return
+    const dx = ev.clientX - startX
+    applySidebarWidthPx(startWidth + dx)
+  }
+  const onUp = () => {
+    sidebarResizeActive = false
+    shell.classList.remove('is-resizing-sidebar')
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', onUp)
+    window.removeEventListener('pointercancel', onUp)
+  }
+  window.addEventListener('pointermove', onMove)
+  window.addEventListener('pointerup', onUp)
+  window.addEventListener('pointercancel', onUp)
+  try {
+    sidebarSplitter.setPointerCapture(e.pointerId)
+  } catch {
+    /* ignore */
+  }
+})
+
+window.addEventListener('resize', () => {
+  if (shell.classList.contains('is-sidebar-collapsed')) return
+  const cs = getComputedStyle(appBody)
+  const w = Number.parseFloat(cs.getPropertyValue('--sidebar-current-width').trim())
+  if (Number.isFinite(w)) applySidebarWidthPx(w)
 })
 
 btnToggleSidebar.addEventListener('click', () => {

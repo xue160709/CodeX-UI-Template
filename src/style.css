@@ -34,6 +34,7 @@
   --padding-panel: calc(var(--spacing) * 3);
   --padding-toolbar: calc(var(--spacing) * 2);
   --width-sidebar: 240px;
+  --width-sidebar-min: 240px;
   --width-sidebar-collapsed: 0px;
   --width-chrome-toolbar: 108px;
   --size-chrome-control: 32px;
@@ -195,7 +196,7 @@ html[data-window-effects='mac-vibrancy'] .app-shell {
   min-width: 0;
   position: relative;
   background: var(--color-token-sidebar-glass-fallback);
-  --sidebar-current-width: var(--width-sidebar);
+  --sidebar-current-width: var(--sidebar-user-width, var(--width-sidebar));
 }
 
 .app-shell.is-sidebar-collapsed .app-body {
@@ -212,6 +213,29 @@ html[data-window-effects='mac-vibrancy'] .app-shell {
   border-right-width: 0;
   box-shadow: none;
   overflow: hidden;
+}
+
+.app-shell.is-sidebar-collapsed .app-sidebar-splitter {
+  display: none;
+}
+
+.app-shell.is-resizing-sidebar .app-sidebar {
+  transition: none;
+}
+
+.app-sidebar-splitter {
+  flex: 0 0 6px;
+  width: 6px;
+  min-height: 0;
+  align-self: stretch;
+  position: relative;
+  z-index: 4;
+  margin-left: -3px;
+  margin-right: -3px;
+  cursor: col-resize;
+  touch-action: none;
+  -webkit-app-region: no-drag;
+  user-select: none;
 }
 
 .app-shell.is-sidebar-collapsed .app-workspace-header {
