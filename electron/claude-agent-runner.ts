@@ -26,6 +26,7 @@ export class ClaudeAgentRunner {
   private activeRequest?: ActiveRequest
   private sessionId?: string
   private model = 'Claude Agent'
+  private configSignature?: string
 
   constructor(
     private readonly webContents: WebContents,
@@ -85,10 +86,17 @@ export class ClaudeAgentRunner {
     await this.cancel()
     this.sessionId = undefined
     this.model = 'Claude Agent'
+    this.configSignature = undefined
   }
 
   private async run(prompt: string, activeRequest: ActiveRequest): Promise<void> {
     const config = this.resolveConfig()
+    const nextConfigSignature = getConfigSignature(config)
+    if (this.configSignature && this.configSignature !== nextConfigSignature) {
+      this.sessionId = undefined
+    }
+    this.configSignature = nextConfigSignature
+
     if (!config.apiKey && !config.authToken) {
       this.emit({
         type: 'error',
@@ -291,15 +299,34 @@ export class ClaudeAgentRunner {
       CLAUDE_AGENT_SDK_CLIENT_APP: 'codex-ui-template/0.0.0',
     }
 
-    if (config.apiKey) {
+    if (config.authToken) {
+      env.ANTHROPIC_AUTH_TOKEN = config.authToken
+      env.ANTHROPIC_API_KEY = undefined
+    } else if (config.apiKey) {
       env.ANTHROPIC_API_KEY = config.apiKey
       env.ANTHROPIC_AUTH_TOKEN = undefined
     }
-    if (config.authToken) env.ANTHROPIC_AUTH_TOKEN = config.authToken
     if (config.baseUrl) env.ANTHROPIC_BASE_URL = config.baseUrl
+    if (config.model) env.ANTHROPIC_MODEL = config.model
+    if (config.defaultHaikuModel) env.ANTHROPIC_DEFAULT_HAIKU_MODEL = config.defaultHaikuModel
+    if (config.defaultOpusModel) env.ANTHROPIC_DEFAULT_OPUS_MODEL = config.defaultOpusModel
+    if (config.defaultSonnetModel) env.ANTHROPIC_DEFAULT_SONNET_MODEL = config.defaultSonnetModel
 
     return env
   }
+}
+
+function getConfigSignature(config: ClaudeAgentResolvedConfig): string {
+  return JSON.stringify([
+    config.configSource,
+    config.apiKey,
+    config.authToken,
+    config.baseUrl,
+    config.model,
+    config.defaultHaikuModel,
+    config.defaultOpusModel,
+    config.defaultSonnetModel,
+  ])
 }
 
 function extractTextFromContent(content: unknown): string {

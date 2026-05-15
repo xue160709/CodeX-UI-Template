@@ -10,10 +10,15 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from 'react'
-import { flushSync } from 'react-dom'
+import { createPortal, flushSync } from 'react-dom'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
-import type { ClaudeChatEvent } from '../claude-chat-types'
+import type {
+  ClaudeAgentModelProvider,
+  ClaudeAgentSettings,
+  ClaudeAgentSettingsSnapshot,
+  ClaudeChatEvent,
+} from '../claude-chat-types'
 import { IconInline } from '../icon-inline'
 
 marked.setOptions({
@@ -51,6 +56,7 @@ type ChatState = {
 }
 
 const CHAT_STATE_STORAGE_KEY = 'CodeX-UI-Template-chat-state-v1'
+const SETTINGS_CHANGED_EVENT = 'claude-agent-settings:changed'
 
 const SUGGESTIONS = [
   'Replace electron-builder placeholders before the first packaged build ships wrong metadata',
@@ -66,6 +72,15 @@ export type ChatPageHandle = {
 type ChatPageProps = {
   hidden: boolean
   onStatusChange: (text: string) => void
+}
+
+type ChatModelMenuRow = {
+  pickKey: string
+  providerId: string
+  anthropicModelId: string
+  useOverlayPick: boolean
+  headline: string
+  metaLine: string
 }
 
 function ChatMessage({ item }: { item: ChatMessageItem }) {
@@ -114,9 +129,23 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
   const [inputValue, setInputValue] = useState('')
   const [isComposingText, setIsComposingText] = useState(false)
   const [showScrollButton, setShowScrollButton] = useState(false)
+  const [modelPickerOpen, setModelPickerOpen] = useState(false)
+  const [modelMenuRows, setModelMenuRows] = useState<ChatModelMenuRow[]>([])
+  const [modelMenuSelectionKey, setModelMenuSelectionKey] = useState('')
 
   const scrollRegionRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
+  const modelPickerRef = useRef<HTMLDivElement>(null)
+  const modelPopoverAnchorRef = useRef<HTMLButtonElement>(null)
+  const modelPopoverSurfaceRef = useRef<HTMLDivElement>(null)
+
+  /** fixed 锚定触发按钮，避免被 .chat-composer / .app-main-inner 裁切 */
+  const [modelPopoverBox, setModelPopoverBox] = useState<{
+    left: number
+    bottom: number
+    width: number
+    maxHeight: number
+  } | null>(null)
   const scrollIntentRef = useRef<'none' | 'force-bottom'>('none')
   const isFirstTranscriptLayoutRef = useRef(true)
   const isRunningRef = useRef(false)
@@ -136,6 +165,100 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       /* ignore */
     }
   }, [chatState])
+
+  useEffect(() => {
+    const applySettingsModel = (snapshot: ClaudeAgentSettingsSnapshot) => {
+      if (isRunningRef.current) return
+      const settings = snapshot.settings
+
+      setModelMenuRows(buildChatModelMenuRows(settings.providers))
+      setModelMenuSelectionKey(pickerSelectionKeyFromSettings(settings))
+
+      const model = resolvedChatDisplayModel(settings)
+
+      setChatState((prev) => ({ ...prev, model }))
+      onStatusChange(compactModelName(model))
+    }
+
+    window.claudeChat?.getSettings().then(applySettingsModel).catch(() => {
+      /* Browser preview can run without the Electron bridge. */
+    })
+
+    const onSettingsChanged = (event: Event) => {
+      applySettingsModel((event as CustomEvent<ClaudeAgentSettingsSnapshot>).detail)
+    }
+    window.addEventListener(SETTINGS_CHANGED_EVENT, onSettingsChanged)
+    return () => window.removeEventListener(SETTINGS_CHANGED_EVENT, onSettingsChanged)
+  }, [onStatusChange])
+
+  const pickChatMenuRow = useCallback(async (row: ChatModelMenuRow) => {
+    if (!window.claudeChat || isRunningRef.current) return
+    try {
+      const snapshot = await window.claudeChat.setActiveChatPick({
+        providerId: row.providerId,
+        anthropicModel: row.useOverlayPick ? row.anthropicModelId : undefined,
+      })
+      window.dispatchEvent(new CustomEvent(SETTINGS_CHANGED_EVENT, { detail: snapshot }))
+      setModelPickerOpen(false)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!modelPickerOpen || !modelPopoverAnchorRef.current) {
+      setModelPopoverBox(null)
+      return
+    }
+    const gap = 6
+    const pad = 8
+    const maxListPx = 280
+
+    const sync = () => {
+      const anchor = modelPopoverAnchorRef.current
+      if (!anchor) return
+      const r = anchor.getBoundingClientRect()
+      const spaceAbove = r.top - pad
+      const maxH = Math.min(maxListPx, Math.max(100, spaceAbove))
+      const minWidth = Math.max(r.width, 248)
+      const vw = window.innerWidth
+      let width = Math.min(Math.max(minWidth, 260), vw - pad * 2)
+      /** 右上角与按钮右上角对齐（面板右边贴按钮右边），再水平夹紧避免出屏 */
+      let left = r.right - width
+      if (left < pad) left = pad
+      if (left + width > vw - pad) left = vw - pad - width
+      const bottom = window.innerHeight - r.top + gap
+      setModelPopoverBox({ left, bottom, width, maxHeight: maxH })
+    }
+
+    sync()
+    window.addEventListener('resize', sync)
+    document.addEventListener('scroll', sync, true)
+    return () => {
+      window.removeEventListener('resize', sync)
+      document.removeEventListener('scroll', sync, true)
+    }
+  }, [modelPickerOpen, modelMenuRows.length])
+
+  useEffect(() => {
+    if (!modelPickerOpen) return
+    const onPointerDown = (event: MouseEvent) => {
+      const t = event.target as Node | null
+      if (!t) return
+      if (modelPickerRef.current?.contains(t)) return
+      if (modelPopoverSurfaceRef.current?.contains(t)) return
+      setModelPickerOpen(false)
+    }
+    const onKeyDown = (event: WindowEventMap['keydown']) => {
+      if (event.key === 'Escape') setModelPickerOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [modelPickerOpen])
 
   useLayoutEffect(() => {
     const sr = scrollRegionRef.current
@@ -557,10 +680,62 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
             </div>
             <div className="composer-actions composer-actions--end">
               <span className={`composer-spinner${isRunning ? ' is-visible' : ''}`} id="composer-spinner" aria-hidden="true" />
-              <button type="button" className="composer-model-button" title="模型" aria-label="模型">
-                <span id="composer-model">{compactModelName(chatState.model)}</span>
-                <IconInline name="chevron" />
-              </button>
+              <div className="composer-model-picker" ref={modelPickerRef}>
+                <button
+                  ref={modelPopoverAnchorRef}
+                  type="button"
+                  className={`composer-model-button${modelPickerOpen ? ' is-open' : ''}`}
+                  id="composer-model-trigger"
+                  title="选择对话使用的模型配置"
+                  aria-label="选择对话使用的模型配置"
+                  aria-expanded={modelPickerOpen}
+                  aria-haspopup="menu"
+                  disabled={isRunning || modelMenuRows.length === 0}
+                  onClick={() => {
+                    if (isRunning || modelMenuRows.length === 0) return
+                    setModelPickerOpen((open) => !open)
+                  }}
+                >
+                  <span id="composer-model">{compactModelName(chatState.model)}</span>
+                  <IconInline name="chevron" />
+                </button>
+                {modelPickerOpen && modelMenuRows.length > 0 && modelPopoverBox
+                  ? createPortal(
+                      <div
+                        ref={modelPopoverSurfaceRef}
+                        className="composer-model-popover"
+                        role="menu"
+                        aria-label="模型配置条目"
+                        style={{
+                          position: 'fixed',
+                          left: modelPopoverBox.left,
+                          bottom: modelPopoverBox.bottom,
+                          width: modelPopoverBox.width,
+                          maxHeight: modelPopoverBox.maxHeight,
+                        }}
+                      >
+                        {modelMenuRows.map((row) => {
+                          const checked = row.pickKey === modelMenuSelectionKey
+                          return (
+                            <button
+                              key={row.pickKey}
+                              type="button"
+                              role="menuitemradio"
+                              className={`composer-model-option${checked ? ' is-selected' : ''}`}
+                              aria-checked={checked}
+                              title={row.metaLine || undefined}
+                              onClick={() => void pickChatMenuRow(row)}
+                            >
+                              <span className="composer-model-option__label">{row.headline}</span>
+                              <span className="composer-model-option__meta">{row.metaLine}</span>
+                            </button>
+                          )
+                        })}
+                      </div>,
+                      document.body,
+                    )
+                  : null}
+              </div>
               {/* 关掉，需要再打开
               <button type="button" className="composer-icon-button" id="btn-dictate" title="语音输入" aria-label="语音输入">
                 <IconInline name="mic" />
@@ -679,7 +854,79 @@ function normalizeTranscriptItems(items: unknown[]): TranscriptItem[] {
   return normalized
 }
 
+function providerAcceptsAnthropicId(provider: ClaudeAgentModelProvider, modelId: string): boolean {
+  const m = modelId.trim()
+  if (!m) return false
+  return [
+    provider.model,
+    provider.defaultHaikuModel,
+    provider.defaultSonnetModel,
+    provider.defaultOpusModel,
+  ]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .includes(m)
+}
+
+function resolvedChatDisplayModel(settings: ClaudeAgentSettings): string {
+  const provider =
+    settings.providers.find((item) => item.id === settings.activeProviderId) ?? settings.providers[0]
+  if (!provider) return 'Claude Agent'
+  const overlay = settings.activeAnthropicModel?.trim() ?? ''
+  if (overlay && providerAcceptsAnthropicId(provider, overlay)) return overlay
+  return provider.model.trim() || provider.name.trim() || 'Claude Agent'
+}
+
+function pickerSelectionKeyFromSettings(settings: ClaudeAgentSettings): string {
+  const provider =
+    settings.providers.find((item) => item.id === settings.activeProviderId) ?? settings.providers[0]
+  const idModel = resolvedChatDisplayModel(settings)
+  if (!provider) return `:${idModel}`
+  return `${provider.id}:${idModel}`
+}
+
+function buildChatModelMenuRows(providers: ClaudeAgentModelProvider[]): ChatModelMenuRow[] {
+  const rows: ChatModelMenuRow[] = []
+  for (const p of providers) {
+    const seen = new Set<string>()
+    const base = providerMenuSubtitle(p)
+
+    const add = (raw: string, slotLabel: string, useOverlayPick: boolean) => {
+      const mid = raw.trim()
+      if (!mid || seen.has(mid)) return
+      seen.add(mid)
+      rows.push({
+        pickKey: `${p.id}:${mid}`,
+        providerId: p.id,
+        anthropicModelId: mid,
+        useOverlayPick,
+        headline: compactModelName(mid),
+        metaLine: [base || null, slotLabel].filter(Boolean).join(' · '),
+      })
+    }
+
+    add(p.model, '主模型', false)
+    add(p.defaultHaikuModel, 'Haiku', true)
+    add(p.defaultSonnetModel, 'Sonnet', true)
+    add(p.defaultOpusModel, 'Opus', true)
+  }
+
+  return rows
+}
+
+function providerMenuSubtitle(entry: ClaudeAgentModelProvider): string {
+  const parts = [
+    entry.name?.trim() && entry.model?.trim() && entry.name.trim() !== entry.model.trim()
+      ? entry.name.trim()
+      : '',
+    entry.baseUrl?.trim() || '',
+  ].filter(Boolean)
+  return parts.join(' · ')
+}
+
 function compactModelName(model: string): string {
+  if (!/^claude-/i.test(model)) return model || 'Claude Agent'
+
   return model
     .replace(/^claude-/i, '')
     .replace(/-/g, ' ')

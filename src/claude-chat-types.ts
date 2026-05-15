@@ -4,11 +4,30 @@ export type ClaudeChatSubmitPayload = {
 
 export type ClaudeAgentConfigSource = 'settings' | 'env'
 
-export type ClaudeAgentSettings = {
-  configSource: ClaudeAgentConfigSource
+export type ClaudeAgentModelProvider = {
+  id: string
+  name: string
   apiKey: string
+  authToken: string
   baseUrl: string
   model: string
+  defaultHaikuModel: string
+  defaultOpusModel: string
+  defaultSonnetModel: string
+}
+
+export type ClaudeAgentSettings = {
+  configSource: ClaudeAgentConfigSource
+  activeProviderId: string
+  /** 选用主 Model 之外的实际请求模型 ID（须属于当前条目的主模型或各档位映射）；空则用语义主 Model */
+  activeAnthropicModel: string
+  providers: ClaudeAgentModelProvider[]
+}
+
+export type ActiveChatPickPayload = {
+  providerId: string
+  /** 省略或空：主 Model；显式传主 Model 时也会归并为空 */
+  anthropicModel?: string | null
 }
 
 export type ClaudeAgentEnvSnapshot = {
@@ -16,6 +35,9 @@ export type ClaudeAgentEnvSnapshot = {
   hasAuthToken: boolean
   baseUrl: string
   model: string
+  defaultHaikuModel: string
+  defaultOpusModel: string
+  defaultSonnetModel: string
 }
 
 export type ClaudeAgentSettingsSnapshot = {
@@ -29,6 +51,9 @@ export type ClaudeAgentResolvedConfig = {
   authToken: string
   baseUrl: string
   model: string
+  defaultHaikuModel: string
+  defaultOpusModel: string
+  defaultSonnetModel: string
 }
 
 export type ClaudeChatSubmitResult = {
@@ -89,5 +114,6 @@ export type ClaudeChatAPI = {
   newThread(): Promise<void>
   getSettings(): Promise<ClaudeAgentSettingsSnapshot>
   saveSettings(settings: ClaudeAgentSettings): Promise<ClaudeAgentSettingsSnapshot>
+  setActiveChatPick(payload: ActiveChatPickPayload): Promise<ClaudeAgentSettingsSnapshot>
   onEvent(handler: ClaudeChatEventHandler): () => void
 }

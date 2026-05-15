@@ -43,9 +43,11 @@ cp .env.example .env.local
 | `ANTHROPIC_API_KEY` | Claude API Key |
 | `ANTHROPIC_BASE_URL` | 自定义 Anthropic 兼容 Base URL |
 | `ANTHROPIC_MODEL` | 默认模型，会传给 Claude Agent SDK 的 `model` 选项 |
-| `ANTHROPIC_AUTH_TOKEN` | 可选，使用 token 鉴权时替代 API Key |
+| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | 可选，Haiku 档位的兼容模型映射 |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | 可选，Sonnet 档位的兼容模型映射 |
+| `ANTHROPIC_DEFAULT_OPUS_MODEL` | 可选，Opus 档位的兼容模型映射 |
 
-应用内也可以在「设置」页填写 API Key、Base URL、Model，并选择「设置页优先」或「环境变量」。默认是设置页优先：表单里的非空值会覆盖同名环境变量，空字段继续沿用 `.env.local` / 系统环境变量。
+应用内可以在「设置」页维护多条模型厂商配置，用于填写各自的 API Key、Base URL、Model 以及 Haiku / Sonnet / Opus 默认模型映射。**实际用在对话里的模型条目**需在聊天输入框旁的模型菜单中切换（会持久化所选条目）；设置页不负责切换对话模型。默认是「设置优先」：当你在聊天里选中的那条配置里某字段有值，则会覆盖同名环境变量；该字段留空时继续沿用 `.env.local` / 系统环境变量。
 
 ## 脚本说明
 

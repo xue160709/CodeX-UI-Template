@@ -4,7 +4,11 @@ import path from 'node:path'
 import { ClaudeAgentRunner } from './claude-agent-runner'
 import { ClaudeAgentSettingsStore } from './claude-agent-settings'
 import { loadMainProcessEnv } from './env-loader'
-import type { ClaudeAgentSettings, ClaudeChatSubmitPayload } from '../src/claude-chat-types'
+import type {
+  ActiveChatPickPayload,
+  ClaudeAgentSettings,
+  ClaudeChatSubmitPayload,
+} from '../src/claude-chat-types'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -133,6 +137,9 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('claude-agent-settings:save', (_event, settings: ClaudeAgentSettings) => {
     return getClaudeAgentSettingsStore().save(settings)
+  })
+  ipcMain.handle('claude-agent-settings:set-active-chat-pick', (_event, payload: ActiveChatPickPayload) => {
+    return getClaudeAgentSettingsStore().setActiveChatPick(payload)
   })
   createWindow()
 })

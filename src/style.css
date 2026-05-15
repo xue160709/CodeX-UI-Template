@@ -550,6 +550,12 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   color: var(--color-token-text-primary);
 }
 
+.btn-compact {
+  height: 28px;
+  padding-inline: calc(var(--spacing) * 2);
+  font-size: var(--text-xs);
+}
+
 .status-pill {
   font-size: var(--text-xs);
   padding: 2px 8px;
@@ -581,10 +587,22 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 }
 
 .settings-stack {
-  max-width: min(36rem, 100%);
+  max-width: min(48rem, 100%);
   display: flex;
   flex-direction: column;
   gap: calc(var(--spacing) * 6);
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--spacing) * 3);
+  margin: 0 0 calc(var(--spacing) * 2);
+}
+
+.settings-section-header .settings-section-heading {
+  margin-bottom: 0;
 }
 
 .settings-section-heading {
@@ -701,6 +719,130 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   font-size: var(--text-xs);
   line-height: 1.45;
   color: var(--color-token-text-secondary);
+}
+
+.settings-provider-list {
+  border: 1px solid var(--color-token-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: color-mix(in oklab, var(--color-token-main-surface-primary) 97%, var(--color-token-foreground));
+}
+
+.settings-provider-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+}
+
+.settings-provider-row + .settings-provider-row {
+  border-top: 1px solid var(--color-token-border-light);
+}
+
+.settings-provider-row.is-editing {
+  background: color-mix(in oklab, var(--color-token-list-active-selection-background) 72%, transparent);
+}
+
+.settings-provider-select {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: calc(var(--spacing) * 2);
+  align-items: center;
+  min-width: 0;
+  padding: calc(var(--spacing) * 2.5) calc(var(--spacing) * 3);
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-provider-select:hover {
+  background: var(--color-token-list-hover-background);
+}
+
+.settings-provider-select:focus-visible {
+  outline: 2px solid var(--color-focus-border);
+  outline-offset: -2px;
+}
+
+.settings-provider-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  margin-right: calc(var(--spacing) * -0.5);
+  color: color-mix(in oklab, var(--color-token-text-secondary) 92%, transparent);
+}
+
+.settings-provider-chevron svg {
+  width: 14px;
+  height: 14px;
+  transform: rotate(-90deg);
+  transition: transform var(--transition-duration-basic) var(--transition-ease-basic);
+}
+
+.settings-provider-row.is-editing .settings-provider-chevron {
+  color: var(--color-token-text-primary);
+}
+
+.settings-provider-row.is-editing .settings-provider-chevron svg {
+  transform: rotate(0deg);
+}
+
+.settings-provider-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: calc(var(--spacing) * 0.5);
+}
+
+.settings-provider-model {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-token-text-primary);
+}
+
+.settings-provider-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--color-token-text-secondary);
+}
+
+.settings-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  min-height: 100%;
+  border: 0;
+  border-left: 1px solid var(--color-token-border-light);
+  color: var(--color-token-text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.settings-icon-button:hover:not(:disabled) {
+  color: var(--color-token-text-primary);
+  background: var(--color-token-list-hover-background);
+}
+
+.settings-icon-button:focus-visible {
+  outline: 2px solid var(--color-focus-border);
+  outline-offset: -2px;
+}
+
+.settings-icon-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .settings-group {
@@ -966,9 +1108,93 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   text-overflow: ellipsis;
 }
 
+.composer-model-picker .composer-model-button > span:last-child {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.composer-model-picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.composer-model-picker .composer-model-button:hover:not(:disabled),
+.composer-model-picker .composer-model-button.is-open {
+  background: var(--color-token-list-hover-background);
+  color: var(--color-token-text-primary);
+}
+
+.composer-model-picker .composer-model-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.composer-model-picker .composer-model-button > span:last-child svg {
+  transition: transform var(--transition-duration-basic) var(--transition-ease-basic);
+}
+
+.composer-model-picker .composer-model-button.is-open > span:last-child svg {
+  transform: rotate(180deg);
+}
+
+.composer-model-popover {
+  z-index: 10050;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: calc(var(--spacing) * 1);
+  border: 1px solid var(--color-token-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-token-main-surface-primary);
+  box-shadow:
+    0 10px 38px color-mix(in oklab, var(--color-token-foreground) 16%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--color-token-border) 40%, transparent);
+}
+
+.composer-model-option {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(var(--spacing) * 0.25);
+  padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 2);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+}
+
+.composer-model-option:hover {
+  background: var(--color-token-list-hover-background);
+}
+
+.composer-model-option.is-selected {
+  background: color-mix(in oklab, var(--color-token-list-active-selection-background) 72%, transparent);
+}
+
+.composer-model-option__label {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-token-text-primary);
+}
+
+.composer-model-option__meta {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--color-token-text-secondary);
+}
+
 .composer-icon-button:hover,
 .composer-mode-button:hover,
-.composer-model-button:hover {
+.composer-model-button:hover:not(:disabled) {
   background: var(--color-token-list-hover-background);
   color: var(--color-token-text-primary);
 }
@@ -1251,7 +1477,7 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 }
 
 @container composer-footer (width <= 520px) {
-  .composer-model-button span,
+  .composer-model-button > span:first-child,
   .composer-mode-button span {
     max-width: 72px;
   }

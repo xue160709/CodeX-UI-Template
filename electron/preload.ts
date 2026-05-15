@@ -1,5 +1,6 @@
 import { ipcRenderer, contextBridge, type IpcRendererEvent } from 'electron'
 import type {
+  ActiveChatPickPayload,
   ClaudeAgentSettings,
   ClaudeChatEvent,
   ClaudeChatEventHandler,
@@ -53,6 +54,9 @@ contextBridge.exposeInMainWorld('claudeChat', {
   },
   saveSettings(settings: ClaudeAgentSettings) {
     return ipcRenderer.invoke('claude-agent-settings:save', settings)
+  },
+  setActiveChatPick(payload: ActiveChatPickPayload) {
+    return ipcRenderer.invoke('claude-agent-settings:set-active-chat-pick', payload)
   },
   onEvent(handler: ClaudeChatEventHandler) {
     const listener = (_event: IpcRendererEvent, event: ClaudeChatEvent) => handler(event)
