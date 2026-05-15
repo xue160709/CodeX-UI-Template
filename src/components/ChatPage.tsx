@@ -1145,10 +1145,6 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                 )
               : null}
           </div>
-          <button type="button" className="chat-context-action" onClick={onNewThread}>
-            <IconInline name="plus" />
-            <span>此项目新对话</span>
-          </button>
         </div>
       </div>
     </section>

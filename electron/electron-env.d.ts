@@ -1,7 +1,7 @@
 /// <reference types="vite-plugin-electron/electron-env" />
 
 import type { ClaudeChatAPI } from '../src/claude-chat-types'
-import type { ChatWorkspaceState } from '../src/components/types'
+import type { ChatWorkspaceState, FileTreeResult } from '../src/components/types'
 
 declare global {
   namespace NodeJS {
@@ -36,6 +36,7 @@ declare global {
         macVibrancy: boolean
       }
       pickProjectDirectory?: () => Promise<string | null>
+      listProjectFiles?: (rootPath: string) => Promise<FileTreeResult>
       getChatWorkspace?: () => Promise<ChatWorkspaceState | null>
       saveChatWorkspace?: (state: ChatWorkspaceState) => Promise<ChatWorkspaceState>
     }

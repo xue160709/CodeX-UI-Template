@@ -25,6 +25,12 @@ export const Icons = {
     '<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="5" width="14" height="10" rx="1.5"/><path stroke-linecap="round" d="M3 19h18"/></svg>',
   folder:
     '<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linejoin="round" d="M4 7.5A2.5 2.5 0 016.5 5H10l2 2h5.5A2.5 2.5 0 0120 9.5v6A2.5 2.5 0 0117.5 18h-11A2.5 2.5 0 014 15.5v-8z"/></svg>',
+  files:
+    '<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linejoin="round" d="M7 3.75h7l4 4v10.5A1.75 1.75 0 0116.25 20h-8.5A1.75 1.75 0 016 18.25V5.5c0-.966.784-1.75 1.75-1.75z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 4v4h4M4 7.5v11.25A3.25 3.25 0 007.25 22h7.25"/></svg>',
+  file:
+    '<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linejoin="round" d="M7 3.75h7l4 4v10.5A1.75 1.75 0 0116.25 20h-8.5A1.75 1.75 0 016 18.25V5.5c0-.966.784-1.75 1.75-1.75z"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 4v4h4"/></svg>',
+  x:
+    '<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>',
   pin:
     '<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14.5 4.5l5 5-3.25 3.25.5 4.25-1.25 1.25-4.25-4.25L7 18.5 5.5 17l4.5-4.25-4.25-4.25L7 7.25l4.25.5L14.5 4.5z"/><path stroke-linecap="round" d="M9.75 14.25L5 19"/></svg>',
   arrowDown:

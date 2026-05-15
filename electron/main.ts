@@ -1,5 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme } from 'electron'
 import { fileURLToPath } from 'node:url'
+import fs from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { ClaudeAgentRunner } from './claude-agent-runner'
 import { ClaudeAgentSettingsStore } from './claude-agent-settings'
@@ -10,6 +12,7 @@ import type {
   ClaudeAgentSettings,
   ClaudeChatSubmitPayload,
 } from '../src/claude-chat-types'
+import type { FileTreeNode, FileTreeResult } from '../src/components/types'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -36,6 +39,23 @@ let win: BrowserWindow | null
 let claudeAgentRunner: ClaudeAgentRunner | null = null
 let claudeAgentSettingsStore: ClaudeAgentSettingsStore | null = null
 let chatWorkspaceStore: ChatWorkspaceStore | null = null
+
+const FILE_TREE_MAX_DEPTH = 8
+const FILE_TREE_MAX_ENTRIES = 1200
+const FILE_TREE_MAX_CHILDREN_PER_DIRECTORY = 200
+const FILE_TREE_IGNORED_DIRECTORIES = new Set([
+  '.git',
+  '.next',
+  '.turbo',
+  '.vite',
+  'build',
+  'coverage',
+  'dist',
+  'dist-electron',
+  'node_modules',
+  'out',
+  'release',
+])
 
 function getWindowBackgroundColor() {
   return nativeTheme.shouldUseDarkColors ? '#181818' : '#f9f9f9'
@@ -168,5 +188,119 @@ app.whenReady().then(() => {
     if (result.canceled || result.filePaths.length === 0) return null
     return result.filePaths[0] ?? null
   })
+  ipcMain.handle('desktop:list-project-files', (_event, rootPath: string) => {
+    return readProjectFileTree(rootPath)
+  })
   createWindow()
 })
+
+async function readProjectFileTree(rootPath: string): Promise<FileTreeResult> {
+  const resolvedRootPath = resolveProjectPath(rootPath)
+  try {
+    const stat = await fs.stat(resolvedRootPath)
+    if (!stat.isDirectory()) {
+      return {
+        ok: false,
+        rootPath: resolvedRootPath,
+        message: '当前项目路径不是文件夹',
+      }
+    }
+
+    let entriesRead = 0
+    let truncated = false
+
+    const readDirectory = async (directoryPath: string, relativeBase: string, depth: number): Promise<FileTreeNode[]> => {
+      if (depth > FILE_TREE_MAX_DEPTH) {
+        truncated = true
+        return []
+      }
+
+      let entries = await fs.readdir(directoryPath, { withFileTypes: true })
+      entries = entries
+        .filter((entry) => !shouldIgnoreFileTreeEntry(entry))
+        .sort((a, b) => {
+          const typeDiff = Number(b.isDirectory()) - Number(a.isDirectory())
+          return typeDiff || a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+        })
+
+      if (entries.length > FILE_TREE_MAX_CHILDREN_PER_DIRECTORY) {
+        entries = entries.slice(0, FILE_TREE_MAX_CHILDREN_PER_DIRECTORY)
+        truncated = true
+      }
+
+      const nodes: FileTreeNode[] = []
+      for (const entry of entries) {
+        if (entriesRead >= FILE_TREE_MAX_ENTRIES) {
+          truncated = true
+          break
+        }
+
+        const entryPath = path.join(directoryPath, entry.name)
+        const relativePath = normalizeRelativePath(path.join(relativeBase, entry.name))
+        entriesRead += 1
+
+        if (entry.isDirectory()) {
+          nodes.push({
+            name: entry.name,
+            path: entryPath,
+            relativePath,
+            type: 'directory',
+            children: await readChildDirectory(entryPath, relativePath, depth + 1),
+          })
+          continue
+        }
+
+        if (entry.isFile() || entry.isSymbolicLink()) {
+          nodes.push({
+            name: entry.name,
+            path: entryPath,
+            relativePath,
+            type: 'file',
+          })
+        }
+      }
+
+      return nodes
+    }
+
+    const readChildDirectory = async (directoryPath: string, relativePath: string, depth: number) => {
+      try {
+        return await readDirectory(directoryPath, relativePath, depth)
+      } catch {
+        truncated = true
+        return []
+      }
+    }
+
+    return {
+      ok: true,
+      rootPath: resolvedRootPath,
+      rootName: path.basename(resolvedRootPath) || resolvedRootPath,
+      nodes: await readDirectory(resolvedRootPath, '', 0),
+      truncated,
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      rootPath: resolvedRootPath,
+      message: error instanceof Error ? error.message : '无法读取文件树',
+    }
+  }
+}
+
+function resolveProjectPath(projectPath: string): string {
+  const trimmedPath = projectPath.trim()
+  if (trimmedPath === '~') return os.homedir()
+  if (trimmedPath.startsWith(`~${path.sep}`) || trimmedPath.startsWith('~/')) {
+    return path.resolve(os.homedir(), trimmedPath.slice(2))
+  }
+  return path.resolve(trimmedPath)
+}
+
+function normalizeRelativePath(relativePath: string): string {
+  return relativePath.split(/[\\/]+/).filter(Boolean).join('/')
+}
+
+function shouldIgnoreFileTreeEntry(entry: import('node:fs').Dirent): boolean {
+  return entry.isDirectory() && FILE_TREE_IGNORED_DIRECTORIES.has(entry.name)
+}

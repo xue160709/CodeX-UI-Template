@@ -72,6 +72,28 @@ export type WorkspaceThread = {
   chatState: ChatState
 }
 
+export type FileTreeNode = {
+  name: string
+  path: string
+  relativePath: string
+  type: 'directory' | 'file'
+  children?: FileTreeNode[]
+}
+
+export type FileTreeResult =
+  | {
+      ok: true
+      rootPath: string
+      rootName: string
+      nodes: FileTreeNode[]
+      truncated: boolean
+    }
+  | {
+      ok: false
+      rootPath: string
+      message: string
+    }
+
 export type ChatWorkspaceState = {
   activeProjectId: string
   activeThreadId: string

@@ -13,7 +13,7 @@ export const SETTINGS_SIDEBAR_NAV: {
   icon: IconName
   disabled?: boolean
 }[] = [
-  { id: 'general', label: '常规', icon: 'settings' },
+  { id: 'general', label: '模型', icon: 'settings' },
   { id: 'appearance', label: '外观', icon: 'laptop' },
 ]
 
@@ -24,7 +24,7 @@ export const VIEW_HEADINGS: Record<AppViewId, string> = {
 }
 
 export function settingsWorkspaceTitle(category: SettingsCategoryId): string {
-  return category === 'appearance' ? '设置 · 外观' : '设置 · 常规'
+  return category === 'appearance' ? '设置 · 外观' : '设置 · 模型'
 }
 
 export const NAV_LABELS: Record<'home' | 'docs', string> = {

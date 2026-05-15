@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('desktop', {
   pickProjectDirectory() {
     return ipcRenderer.invoke('desktop:pick-project-directory') as Promise<string | null>
   },
+  listProjectFiles(rootPath: string) {
+    return ipcRenderer.invoke('desktop:list-project-files', rootPath)
+  },
   getChatWorkspace() {
     return ipcRenderer.invoke('chat-workspace:get')
   },

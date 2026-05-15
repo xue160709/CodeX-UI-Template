@@ -687,6 +687,7 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 }
 
 .app-workspace {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -748,6 +749,15 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   gap: calc(var(--spacing) * 2);
 }
 
+.app-workspace-content {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-token-main-surface-primary);
+}
+
 .app-main {
   position: relative;
   z-index: 0;
@@ -756,6 +766,225 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   min-height: 0;
   overflow: hidden;
   background: var(--color-token-main-surface-primary);
+}
+
+.app-file-panel {
+  --file-panel-width: clamp(280px, 28vw, 420px);
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 var(--file-panel-width);
+  width: var(--file-panel-width);
+  max-width: 0;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-token-text-primary);
+  background: color-mix(in oklab, var(--color-token-main-surface-primary) 96%, var(--color-token-foreground));
+  border-left: 1px solid transparent;
+  box-shadow: none;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(16px);
+  transition:
+    max-width var(--transition-duration-relaxed) var(--cubic-enter),
+    transform var(--transition-duration-relaxed) var(--cubic-enter),
+    border-color var(--transition-duration-basic) var(--transition-ease-basic),
+    opacity var(--transition-duration-basic) var(--transition-ease-basic),
+    box-shadow var(--transition-duration-basic) var(--transition-ease-basic);
+}
+
+.app-file-panel.is-open {
+  max-width: var(--file-panel-width);
+  border-left-color: var(--color-token-border);
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+  box-shadow: -10px 0 24px -24px color-mix(in oklab, var(--color-token-foreground) 46%, transparent);
+}
+
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .app-file-panel {
+    background: color-mix(in oklab, var(--color-token-main-surface-primary) 82%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(1.2);
+    backdrop-filter: blur(24px) saturate(1.2);
+  }
+}
+
+.app-file-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--spacing) * 2);
+  min-height: var(--height-toolbar-sm);
+  padding: calc(var(--spacing) * 1) calc(var(--spacing) * 2) calc(var(--spacing) * 1)
+    calc(var(--spacing) * 3);
+  border-bottom: 1px solid var(--color-token-border);
+}
+
+.app-file-panel-heading,
+.app-file-panel-actions,
+.app-file-tree-row > span:has(.icon-xs) {
+  display: inline-flex;
+  align-items: center;
+}
+
+.app-file-panel-heading {
+  min-width: 0;
+  gap: calc(var(--spacing) * 2);
+  font-size: var(--text-sm);
+  line-height: 18px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-token-text-primary);
+}
+
+.app-file-panel-actions {
+  flex-shrink: 0;
+  gap: calc(var(--spacing) * 0.5);
+}
+
+.app-file-panel-actions .btn-toolbar {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+}
+
+.app-file-panel-project {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing) * 0.5);
+  min-width: 0;
+  padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+  border-bottom: 1px solid var(--color-token-border-light);
+}
+
+.app-file-panel-project-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-token-text-primary);
+}
+
+.app-file-panel-count {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--color-token-text-tertiary);
+}
+
+.app-file-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 1.5) calc(var(--spacing) * 3);
+}
+
+.app-file-panel-state {
+  margin: calc(var(--spacing) * 1.5);
+  padding: calc(var(--spacing) * 2);
+  border-radius: var(--radius-md);
+  color: var(--color-token-text-secondary);
+  background: var(--color-token-list-hover-background);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.app-file-panel-state.is-subtle {
+  margin-top: calc(var(--spacing) * 2);
+  color: var(--color-token-text-tertiary);
+  background: transparent;
+}
+
+.app-file-tree {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-file-tree-item {
+  min-width: 0;
+}
+
+.app-file-tree-row {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing) * 1.5);
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 calc(var(--spacing) * 2) 0
+    calc(var(--spacing) * 2 + var(--file-depth, 0) * 14px);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-token-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: left;
+  user-select: none;
+  transition:
+    background var(--transition-duration-basic) var(--transition-ease-basic),
+    color var(--transition-duration-basic) var(--transition-ease-basic);
+}
+
+button.app-file-tree-row {
+  cursor: pointer;
+}
+
+.app-file-tree-row:hover,
+.app-file-tree-row:focus-visible {
+  color: var(--color-token-text-primary);
+  background: var(--color-token-list-hover-background);
+  outline: none;
+}
+
+.app-file-tree-row:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-token-focus-border) 54%, transparent);
+}
+
+.app-file-tree-row.is-directory {
+  color: var(--color-token-text-primary);
+}
+
+.app-file-tree-row.is-file .icon-xs {
+  color: var(--color-token-text-tertiary);
+}
+
+.app-file-tree-chevron,
+.app-file-tree-spacer {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
+.app-file-tree-chevron {
+  justify-content: center;
+  color: var(--color-token-text-tertiary);
+  transform: rotate(-90deg);
+  transition:
+    color var(--transition-duration-basic) var(--transition-ease-basic),
+    transform var(--transition-duration-basic) var(--transition-ease-basic);
+}
+
+.app-file-tree-row.is-expanded .app-file-tree-chevron {
+  color: var(--color-token-text-secondary);
+  transform: rotate(0deg);
+}
+
+.app-file-tree-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-main-inner {
@@ -867,12 +1096,12 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 .btn-primary {
   height: 36px;
   padding: 0 calc(var(--spacing) * 4);
-  color: var(--gray-0);
-  background: var(--blue-500);
-  border-color: color-mix(in oklab, var(--blue-500) 70%, black);
+  color: var(--color-token-button-foreground);
+  background: var(--color-token-button-background);
+  border-color: var(--color-token-button-border);
 }
 .btn-primary:hover:not(:disabled) {
-  filter: brightness(1.06);
+  background: color-mix(in oklab, var(--color-token-button-background) 92%, var(--color-token-main-surface-primary));
 }
 
 .btn-ghost {
@@ -907,12 +1136,32 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 
 .settings-page {
   width: min(960px, 100%);
+  --settings-focus-border: color-mix(in oklab, var(--color-token-foreground) 42%, transparent);
+  --settings-focus-ring: color-mix(in oklab, var(--color-token-foreground) 16%, transparent);
+  --settings-row-surface: color-mix(
+    in oklab,
+    var(--color-token-main-surface-primary) 96%,
+    var(--color-token-foreground)
+  );
+  --settings-row-surface-strong: color-mix(
+    in oklab,
+    var(--color-token-main-surface-primary) 90%,
+    var(--color-token-foreground)
+  );
+  --settings-row-surface-soft: color-mix(
+    in oklab,
+    var(--color-token-main-surface-primary) 98%,
+    var(--color-token-foreground)
+  );
+  --settings-selected-indicator: color-mix(in oklab, var(--color-token-foreground) 72%, transparent);
 }
 
 /* Codex / VS Code–style preferences: grouped sections, segmented mode control, bordered row stack */
 
 .settings-page-header {
   margin-bottom: calc(var(--spacing) * 6);
+  padding-bottom: calc(var(--spacing) * 4);
+  border-bottom: 1px solid var(--color-token-border-light);
 }
 
 .settings-lede {
@@ -924,10 +1173,10 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 }
 
 .settings-stack {
-  max-width: min(48rem, 100%);
+  max-width: min(50rem, 100%);
   display: flex;
   flex-direction: column;
-  gap: calc(var(--spacing) * 6);
+  gap: calc(var(--spacing) * 6.5);
 }
 
 .settings-section-header {
@@ -946,7 +1195,7 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   margin: 0 0 calc(var(--spacing) * 2);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   color: var(--color-token-text-primary);
 }
 
@@ -964,7 +1213,7 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   padding: calc(var(--spacing) * 1);
   border: 1px solid var(--color-token-border);
   border-radius: var(--radius-lg);
-  background: color-mix(in oklab, var(--color-token-foreground) 3.5%, var(--color-token-main-surface-primary));
+  background: var(--settings-row-surface);
 }
 
 .settings-segment {
@@ -985,14 +1234,15 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 }
 
 .settings-segment:focus-within {
-  border-color: var(--color-token-border-heavy);
+  border-color: var(--settings-focus-border);
+  box-shadow: 0 0 0 2px var(--settings-focus-ring);
 }
 
 .settings-segment.is-selected {
-  background: color-mix(in oklab, var(--color-token-main-surface-primary) 88%, var(--color-token-foreground));
+  background: var(--settings-row-surface-soft);
   border-color: var(--color-token-border-heavy);
   box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--color-focus-border) 46%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--color-token-foreground) 10%, transparent),
     0 1px 2px color-mix(in oklab, var(--color-token-foreground) 10%, transparent);
 }
 
@@ -1037,8 +1287,8 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 }
 
 .settings-segment.is-selected .settings-segment-radio {
-  border-color: var(--blue-400);
-  background-color: var(--blue-400);
+  border-color: var(--color-token-text-primary);
+  background-color: var(--color-token-text-primary);
   box-shadow: inset 0 0 0 3px var(--color-token-main-surface-primary);
 }
 
@@ -1062,13 +1312,23 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   border: 1px solid var(--color-token-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  background: color-mix(in oklab, var(--color-token-main-surface-primary) 97%, var(--color-token-foreground));
+  background: var(--settings-row-surface);
 }
 
 .settings-provider-row {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: stretch;
+}
+
+.settings-provider-row::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--spacing) * 2) auto calc(var(--spacing) * 2) 0;
+  width: 2px;
+  border-radius: var(--radius-full);
+  background: transparent;
 }
 
 .settings-provider-row + .settings-provider-row {
@@ -1076,7 +1336,11 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 }
 
 .settings-provider-row.is-editing {
-  background: color-mix(in oklab, var(--color-token-list-active-selection-background) 72%, transparent);
+  background: color-mix(in oklab, var(--color-token-list-active-selection-background) 66%, transparent);
+}
+
+.settings-provider-row.is-editing::before {
+  background: var(--settings-selected-indicator);
 }
 
 .settings-provider-select {
@@ -1099,7 +1363,7 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 }
 
 .settings-provider-select:focus-visible {
-  outline: 2px solid var(--color-focus-border);
+  outline: 2px solid var(--settings-focus-border);
   outline-offset: -2px;
 }
 
@@ -1173,7 +1437,7 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 }
 
 .settings-icon-button:focus-visible {
-  outline: 2px solid var(--color-focus-border);
+  outline: 2px solid var(--settings-focus-border);
   outline-offset: -2px;
 }
 
@@ -1186,7 +1450,7 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   border: 1px solid var(--color-token-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  background: color-mix(in oklab, var(--color-token-main-surface-primary) 97%, var(--color-token-foreground));
+  background: var(--settings-row-surface);
 }
 
 .settings-field-row {
@@ -1199,6 +1463,10 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 
 .settings-field-row + .settings-field-row {
   border-top: 1px solid var(--color-token-border-light);
+}
+
+.settings-field-row:focus-within {
+  background: color-mix(in oklab, var(--color-token-list-hover-background) 64%, transparent);
 }
 
 .settings-field-row__label {
@@ -1232,8 +1500,8 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 }
 
 .settings-input:focus {
-  border-color: var(--color-focus-border);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-focus-border) 22%, transparent);
+  border-color: var(--settings-focus-border);
+  box-shadow: 0 0 0 2px var(--settings-focus-ring);
 }
 
 .settings-input::placeholder {
@@ -1261,7 +1529,7 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   font-size: var(--text-xs);
   line-height: 1.35;
   color: var(--color-token-text-secondary);
-  background: color-mix(in oklab, var(--color-token-foreground) 4%, transparent);
+  background: var(--settings-row-surface-strong);
 }
 
 .settings-footer {
@@ -1279,6 +1547,10 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 .settings-status {
   color: var(--color-token-text-secondary);
   font-size: var(--text-xs);
+}
+
+.settings-page .btn:focus-visible {
+  outline-color: var(--settings-focus-border);
 }
 
 .read-the-docs {
@@ -2080,6 +2352,18 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 }
 
 @media (max-width: 720px) {
+  .app-shell.is-shell-settings .app-body {
+    --sidebar-current-width: clamp(148px, 42vw, 188px);
+  }
+
+  .app-shell.is-shell-settings .app-sidebar-scroll {
+    padding-inline: calc(var(--spacing) * 2);
+  }
+
+  .app-shell.is-shell-settings .app-main-inner {
+    padding-inline: calc(var(--spacing) * 4);
+  }
+
   .chat-page {
     padding-inline: calc(var(--spacing) * 4);
   }

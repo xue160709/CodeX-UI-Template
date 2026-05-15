@@ -19,7 +19,7 @@ export function ClaudeAgentSettingsPage() {
   const [editingProviderId, setEditingProviderId] = useState('')
   /** 持久化字段：与聊天输入框模型菜单一致，保存设置时不得被「编辑中」条目覆盖 */
   const [chatActiveProviderId, setChatActiveProviderId] = useState('')
-  /** 选中主 Model 之外的实际请求模型；空则用该条目 Model 字段 */
+  /** 选中的实际请求模型；空则沿用该条目的默认模型字段 */
   const [chatActiveAnthropicModel, setChatActiveAnthropicModel] = useState('')
   const [envStatusTags, setEnvStatusTags] = useState(['ENV: 未读取'])
   const [status, setStatus] = useState('')
@@ -147,11 +147,11 @@ export function ClaudeAgentSettingsPage() {
   }, [load])
 
   return (
-    <section className="app-main-inner settings-page" id="panel-settings" aria-hidden={false}>
+    <section className="app-main-inner settings-page settings-page--models" id="panel-settings" aria-hidden={false}>
       <header className="settings-page-header">
-        <h1 className="app-main-heading">Claude Agent</h1>
+        <h1 className="app-main-heading">模型</h1>
         <p className="settings-lede">
-          在此处填写多条模型厂商配置。真正用于对话请求的条目须在聊天输入框旁的模型菜单中切换；条目中的 API Key、Base URL、Model 会与所选条目对齐。
+          配置 Claude Agent 使用的模型厂商、凭据和模型映射。真正用于对话请求的条目仍在聊天输入框旁的模型菜单中切换。
         </p>
       </header>
 
@@ -217,7 +217,7 @@ export function ClaudeAgentSettingsPage() {
             </button>
           </div>
           <p className="settings-section-caption">
-            点击某行仅打开下方表单进行填写，不会在设置页切换对话模型。主 Model、Haiku / Sonnet / Opus 映射里填写的标识符都会在聊天模型菜单中出现（同一标识符只展示一行）。
+            点击某行仅打开下方表单进行填写，不会在设置页切换对话模型。Haiku / Sonnet / Opus 映射里填写的标识符都会在聊天模型菜单中出现（同一标识符只展示一行）。
           </p>
           <div className="settings-provider-list" role="list" aria-label="模型厂商条目">
             {providers.map((provider) => {
