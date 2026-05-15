@@ -2048,7 +2048,7 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 .btn-scroll-bottom {
   position: absolute;
   left: 50%;
-  bottom: 148px;
+  bottom: 180px;
   z-index: 3;
   width: 38px;
   height: 38px;
