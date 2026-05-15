@@ -86,7 +86,7 @@ export function AppShellSidebar({
                     type="button"
                     disabled={item.disabled}
                     title={item.disabled ? '尚未实现' : undefined}
-                    className={`app-settings-nav-item${settingsCategory === item.id ? ' is-active' : ''}`}
+                    className={`app-nav-item${settingsCategory === item.id ? ' is-active' : ''}`}
                     data-settings-category={item.id}
                     onClick={() => {
                       if (item.disabled) {

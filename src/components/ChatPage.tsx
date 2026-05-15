@@ -260,6 +260,15 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     }
   }, [modelPickerOpen])
 
+  const syncScrollButtonVisibility = useCallback(() => {
+    const sr = scrollRegionRef.current
+    if (!sr || sr.hidden) {
+      setShowScrollButton(false)
+      return
+    }
+    setShowScrollButton((prev) => shouldShowScrollToBottom(sr, prev))
+  }, [])
+
   useLayoutEffect(() => {
     const sr = scrollRegionRef.current
     if (!sr || !hasMessages) {
@@ -277,20 +286,37 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       sr.scrollTo({ top: sr.scrollHeight, behavior: 'auto' })
       setShowScrollButton(false)
     } else {
-      setShowScrollButton(!isNearBottom(sr))
+      syncScrollButtonVisibility()
     }
-  }, [chatState, hasMessages])
+  }, [chatState, hasMessages, syncScrollButtonVisibility])
 
   useEffect(() => {
     const sr = scrollRegionRef.current
     if (!sr) return
     const onScroll = () => {
       if (!chatState.items.length) return
-      setShowScrollButton(!isNearBottom(sr))
+      syncScrollButtonVisibility()
     }
-    sr.addEventListener('scroll', onScroll)
+    sr.addEventListener('scroll', onScroll, { passive: true })
     return () => sr.removeEventListener('scroll', onScroll)
-  }, [chatState.items.length])
+  }, [chatState.items.length, syncScrollButtonVisibility])
+
+  useEffect(() => {
+    const sr = scrollRegionRef.current
+    const transcript = sr?.querySelector('.chat-transcript')
+    if (!sr || !transcript || !hasMessages) return
+
+    const ro = new ResizeObserver(() => {
+      if (scrollIntentRef.current === 'force-bottom' || isNearBottom(sr)) {
+        sr.scrollTo({ top: sr.scrollHeight, behavior: 'auto' })
+        setShowScrollButton(false)
+        return
+      }
+      syncScrollButtonVisibility()
+    })
+    ro.observe(transcript)
+    return () => ro.disconnect()
+  }, [hasMessages, syncScrollButtonVisibility])
 
   const resizeComposer = useCallback(() => {
     const ta = chatInputRef.current
@@ -644,7 +670,10 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         id="btn-scroll-bottom"
         title="滚动到底部"
         aria-label="滚动到底部"
-        hidden={!hasMessages || !showScrollButton}
+        hidden={!hasMessages}
+        aria-hidden={!showScrollButton}
+        tabIndex={showScrollButton ? 0 : -1}
+        data-visible={showScrollButton || undefined}
         onClick={() => scrollToBottom('smooth')}
       >
         <IconInline name="arrowDown" />
@@ -946,8 +975,38 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-function isNearBottom(scrollRegion: HTMLElement): boolean {
-  if (scrollRegion.hidden) return true
+/** 贴底跟随：距底部小于此值视为在底部 */
+const SCROLL_STICK_THRESHOLD_PX = 96
+/** 滞后显示：向上滚过此距离后才出现按钮，避免临界抖动 */
+const SCROLL_SHOW_BUTTON_PX = 120
+/** 滞后隐藏：回到距底部此距离内才隐藏 */
+const SCROLL_HIDE_BUTTON_PX = 48
+/** 内容至少高出可视区这么多才视为可滚动 */
+const SCROLL_OVERFLOW_MIN_PX = 8
+
+function getScrollMetrics(scrollRegion: HTMLElement) {
+  const overflow = scrollRegion.scrollHeight - scrollRegion.clientHeight
   const remaining = scrollRegion.scrollHeight - scrollRegion.scrollTop - scrollRegion.clientHeight
-  return remaining < 96
+  return { overflow, remaining }
+}
+
+function isScrollable(scrollRegion: HTMLElement): boolean {
+  if (scrollRegion.hidden) return false
+  return getScrollMetrics(scrollRegion).overflow > SCROLL_OVERFLOW_MIN_PX
+}
+
+function isNearBottom(
+  scrollRegion: HTMLElement,
+  threshold = SCROLL_STICK_THRESHOLD_PX,
+): boolean {
+  if (scrollRegion.hidden) return true
+  if (!isScrollable(scrollRegion)) return true
+  return getScrollMetrics(scrollRegion).remaining < threshold
+}
+
+function shouldShowScrollToBottom(scrollRegion: HTMLElement, currentlyShown: boolean): boolean {
+  if (scrollRegion.hidden || !isScrollable(scrollRegion)) return false
+  const { remaining } = getScrollMetrics(scrollRegion)
+  if (currentlyShown) return remaining > SCROLL_HIDE_BUTTON_PX
+  return remaining > SCROLL_SHOW_BUTTON_PX
 }
