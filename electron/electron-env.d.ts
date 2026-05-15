@@ -1,6 +1,10 @@
 /// <reference types="vite-plugin-electron/electron-env" />
 
 import type { ClaudeChatAPI } from '../src/claude-chat-types'
+import type {
+  AgentContextResult,
+  ProjectFileSearchResult,
+} from '../src/claude-chat-types'
 import type { ChatWorkspaceState, FileTreeResult } from '../src/components/types'
 
 declare global {
@@ -37,6 +41,8 @@ declare global {
       }
       pickProjectDirectory?: () => Promise<string | null>
       listProjectFiles?: (rootPath: string) => Promise<FileTreeResult>
+      searchProjectFiles?: (rootPath: string, query: string) => Promise<ProjectFileSearchResult>
+      listAgentContext?: (rootPath: string) => Promise<AgentContextResult>
       getChatWorkspace?: () => Promise<ChatWorkspaceState | null>
       saveChatWorkspace?: (state: ChatWorkspaceState) => Promise<ChatWorkspaceState>
     }

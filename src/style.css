@@ -1802,6 +1802,64 @@ button.app-file-tree-row {
   color: var(--color-token-text-secondary);
 }
 
+.composer-autocomplete-popover {
+  z-index: 10060;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: calc(var(--spacing) * 1);
+  border: 1px solid var(--color-token-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-token-main-surface-primary);
+  box-shadow:
+    0 14px 42px color-mix(in oklab, var(--color-token-foreground) 18%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--color-token-border) 45%, transparent);
+}
+
+.composer-autocomplete-option {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: calc(var(--spacing) * 2);
+  width: 100%;
+  min-height: 40px;
+  padding: calc(var(--spacing) * 1.25) calc(var(--spacing) * 2);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.composer-autocomplete-option:hover,
+.composer-autocomplete-option.is-selected {
+  background: var(--color-token-list-hover-background);
+}
+
+.composer-autocomplete-option__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.composer-autocomplete-option__copy > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-token-text-primary);
+  font-size: var(--text-sm);
+}
+
+.composer-autocomplete-option__copy > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-token-text-tertiary);
+  font-size: var(--text-xs);
+}
+
 .composer-icon-button:hover,
 .composer-mode-button:hover,
 .composer-model-button:hover:not(:disabled) {
@@ -1902,6 +1960,11 @@ button.app-file-tree-row {
 .chat-context-action:hover {
   color: var(--color-token-text-primary);
   background: var(--color-token-list-hover-background);
+}
+
+.chat-context-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
 }
 
 .chat-project-trigger > span:nth-child(2),

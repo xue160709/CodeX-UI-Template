@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { discoverAgentContext, searchProjectFiles } from './agent-context'
 import { ClaudeAgentRunner } from './claude-agent-runner'
 import { ClaudeAgentSettingsStore } from './claude-agent-settings'
 import { ChatWorkspaceStore } from './chat-workspace-store'
@@ -190,6 +191,12 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('desktop:list-project-files', (_event, rootPath: string) => {
     return readProjectFileTree(rootPath)
+  })
+  ipcMain.handle('desktop:search-project-files', (_event, rootPath: string, query: string) => {
+    return searchProjectFiles(rootPath, query)
+  })
+  ipcMain.handle('desktop:list-agent-context', (_event, rootPath: string) => {
+    return discoverAgentContext(rootPath)
   })
   createWindow()
 })

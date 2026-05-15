@@ -9,6 +9,7 @@ import type {
   ClaudeChatSubmitPayload,
   ClaudeChatSubmitResult,
 } from '../src/claude-chat-types'
+import { buildRuntimeContext, resolvePromptWithContext } from './agent-context'
 
 export const CLAUDE_CHAT_EVENT_CHANNEL = 'claude-chat:event'
 
@@ -26,7 +27,7 @@ type ActiveRequest = {
   streamBlocks: Map<number, StreamBlockState>
 }
 
-const READ_ONLY_TOOLS = ['Read', 'Glob', 'Grep']
+const DEFAULT_AGENT_TOOLS = ['Read', 'Glob', 'Grep', 'Skill', 'Agent', 'Task']
 
 type ThreadRuntimeState = {
   sessionId?: string
@@ -139,11 +140,14 @@ export class ClaudeAgentRunner {
     }
 
     try {
+      const runtimeContext = await buildRuntimeContext(activeRequest.cwd)
+      const resolvedPrompt = await resolvePromptWithContext(prompt, runtimeContext.catalog)
       const response = query({
-        prompt,
+        prompt: resolvedPrompt,
         options: {
           abortController: activeRequest.abortController,
-          allowedTools: READ_ONLY_TOOLS,
+          agents: runtimeContext.agents,
+          allowedTools: DEFAULT_AGENT_TOOLS,
           cwd: activeRequest.cwd,
           env: this.buildSdkEnv(config),
           forwardSubagentText: true,
@@ -152,8 +156,12 @@ export class ClaudeAgentRunner {
           model: config.model || undefined,
           permissionMode: 'dontAsk',
           resume: threadState.sessionId,
-          settingSources: [],
-          tools: READ_ONLY_TOOLS,
+          settingSources: ['user', 'project', 'local'],
+          skills: 'all',
+          systemPrompt: runtimeContext.appendSystemPrompt
+            ? { type: 'preset', preset: 'claude_code', append: runtimeContext.appendSystemPrompt }
+            : undefined,
+          tools: DEFAULT_AGENT_TOOLS,
         },
       })
 
@@ -240,6 +248,8 @@ export class ClaudeAgentRunner {
       threadState.model = message.model || 'Claude Agent'
       const tools = Array.isArray(message.tools) ? message.tools : []
       const skills = Array.isArray(message.skills) ? message.skills : []
+      const slashCommands = Array.isArray(message.slash_commands) ? message.slash_commands : []
+      const agents = Array.isArray(message.agents) ? message.agents : []
       const mcpServers = Array.isArray(message.mcp_servers) ? message.mcp_servers : []
       const plugins = Array.isArray(message.plugins) ? message.plugins.map((plugin) => plugin.name) : []
       this.emit({
@@ -250,6 +260,8 @@ export class ClaudeAgentRunner {
         cwd: message.cwd || activeRequest.cwd,
         tools,
         skills,
+        slashCommands,
+        agents,
         mcpServers,
         permissionMode: message.permissionMode || '',
         plugins,
@@ -264,10 +276,13 @@ export class ClaudeAgentRunner {
           message.permissionMode ? `权限 ${message.permissionMode}` : '',
           `${tools.length} tools`,
           `${skills.length} skills`,
+          `${agents.length} agents`,
         ]),
         joinPreview([
           formatListPreview('Tools', tools),
           formatListPreview('Skills', skills),
+          formatListPreview('Slash', slashCommands),
+          formatListPreview('Agents', agents),
           formatListPreview('MCP', mcpServers.map((server) => `${server.name}:${server.status}`)),
           formatListPreview('Plugins', plugins),
         ]),

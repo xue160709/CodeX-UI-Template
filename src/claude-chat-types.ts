@@ -5,6 +5,83 @@ export type ClaudeChatSubmitPayload = {
   cwd?: string
 }
 
+export type AgentContextScope = 'user' | 'project'
+
+export type AgentContextSource = 'claude' | 'agent' | 'cursor'
+
+export type AgentContextSlashKind = 'skill' | 'command'
+
+export type AgentContextSlashItem = {
+  kind: AgentContextSlashKind
+  name: string
+  command: string
+  title: string
+  description: string
+  argumentHint: string
+  path: string
+  relativePath: string
+  scope: AgentContextScope
+  source: AgentContextSource
+  native: boolean
+}
+
+export type AgentContextAgentItem = {
+  kind: 'agent'
+  name: string
+  description: string
+  path: string
+  relativePath: string
+  scope: AgentContextScope
+  source: AgentContextSource
+  native: boolean
+  model?: string
+  tools: string[]
+}
+
+export type AgentInstructionFile = {
+  name: string
+  path: string
+  relativePath: string
+  scope: AgentContextScope
+  source: AgentContextSource
+  loadMode: 'sdk' | 'host'
+}
+
+export type AgentContextCatalog = {
+  ok: true
+  rootPath: string
+  skills: AgentContextSlashItem[]
+  agents: AgentContextAgentItem[]
+  instructionFiles: AgentInstructionFile[]
+}
+
+export type AgentContextResult =
+  | AgentContextCatalog
+  | {
+      ok: false
+      rootPath: string
+      message: string
+    }
+
+export type ProjectFileSearchItem = {
+  label: string
+  path: string
+  relativePath: string
+  type: 'directory' | 'file'
+}
+
+export type ProjectFileSearchResult =
+  | {
+      ok: true
+      rootPath: string
+      items: ProjectFileSearchItem[]
+    }
+  | {
+      ok: false
+      rootPath: string
+      message: string
+    }
+
 export type ClaudeAgentConfigSource = 'settings' | 'env'
 
 export type ClaudeAgentModelProvider = {
@@ -74,6 +151,8 @@ export type ClaudeChatEvent =
       cwd: string
       tools: string[]
       skills: string[]
+      slashCommands: string[]
+      agents: string[]
       mcpServers: { name: string; status: string }[]
       permissionMode: string
       plugins: string[]

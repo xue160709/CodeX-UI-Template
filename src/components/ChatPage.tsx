@@ -14,10 +14,14 @@ import { createPortal, flushSync } from 'react-dom'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import type {
+  AgentContextAgentItem,
+  AgentContextCatalog,
+  AgentContextSlashItem,
   ClaudeAgentModelProvider,
   ClaudeAgentSettings,
   ClaudeAgentSettingsSnapshot,
   ClaudeChatEvent,
+  ProjectFileSearchItem,
 } from '../claude-chat-types'
 import { IconInline } from '../icon-inline'
 import type {
@@ -66,6 +70,78 @@ type ChatModelMenuRow = {
   headline: string
   metaLine: string
 }
+
+type ComposerTrigger =
+  | {
+      kind: 'slash'
+      query: string
+      start: number
+      end: number
+    }
+  | {
+      kind: 'mention'
+      query: string
+      start: number
+      end: number
+    }
+
+type ComposerSuggestion =
+  | {
+      id: string
+      kind: 'slash'
+      title: string
+      subtitle: string
+      insertText: string
+      item: AgentContextSlashItem | BuiltInSlashCommand
+    }
+  | {
+      id: string
+      kind: 'file'
+      title: string
+      subtitle: string
+      insertText: string
+      item: ProjectFileSearchItem
+    }
+  | {
+      id: string
+      kind: 'agent'
+      title: string
+      subtitle: string
+      insertText: string
+      item: AgentContextAgentItem
+    }
+
+type BuiltInSlashCommand = {
+  kind: 'built-in'
+  command: string
+  title: string
+  description: string
+  argumentHint: string
+}
+
+const BUILT_IN_SLASH_COMMANDS: BuiltInSlashCommand[] = [
+  {
+    kind: 'built-in',
+    command: 'compact',
+    title: '/compact',
+    description: '压缩当前会话上下文，保留后续继续工作需要的信息。',
+    argumentHint: '[instructions]',
+  },
+  {
+    kind: 'built-in',
+    command: 'status',
+    title: '/status',
+    description: '查看当前会话、模型、工具和上下文状态。',
+    argumentHint: '',
+  },
+  {
+    kind: 'built-in',
+    command: 'help',
+    title: '/help',
+    description: '查看 Claude Agent 可用的会话命令。',
+    argumentHint: '',
+  },
+]
 
 function ChatMessage({ item }: { item: ChatMessageItem }) {
   const bodyHtml = useMemo(() => {
@@ -204,6 +280,12 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
   const [projectPickerOpen, setProjectPickerOpen] = useState(false)
   const [modelMenuRows, setModelMenuRows] = useState<ChatModelMenuRow[]>([])
   const [modelMenuSelectionKey, setModelMenuSelectionKey] = useState('')
+  const [agentContext, setAgentContext] = useState<AgentContextCatalog | null>(null)
+  const [agentContextLoading, setAgentContextLoading] = useState(false)
+  const [composerSelection, setComposerSelection] = useState({ start: 0, end: 0 })
+  const [dismissedAutocompleteKey, setDismissedAutocompleteKey] = useState('')
+  const [fileMentionResults, setFileMentionResults] = useState<ProjectFileSearchItem[]>([])
+  const [composerSuggestionIndex, setComposerSuggestionIndex] = useState(0)
   /** 与 Electron claude-agent-settings 对齐，composer 仅展示此项 */
   const [globalDisplayModel, setGlobalDisplayModel] = useState('Claude Agent')
 
@@ -211,6 +293,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const modelPickerRef = useRef<HTMLDivElement>(null)
   const projectPickerRef = useRef<HTMLDivElement>(null)
+  const composerAutocompleteSurfaceRef = useRef<HTMLDivElement>(null)
   const projectPopoverAnchorRef = useRef<HTMLButtonElement>(null)
   const projectPopoverSurfaceRef = useRef<HTMLDivElement>(null)
   const modelPopoverAnchorRef = useRef<HTMLButtonElement>(null)
@@ -238,6 +321,13 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
   const activeAssistantMessageIdRef = useRef<string | undefined>(undefined)
   const globalDisplayModelRef = useRef(globalDisplayModel)
 
+  const [composerAutocompleteBox, setComposerAutocompleteBox] = useState<{
+    left: number
+    bottom: number
+    width: number
+    maxHeight: number
+  } | null>(null)
+
   const hasMessages = chatState.items.length > 0
   const setThreadChatState = useCallback(
     (threadId: string, update: ChatState | ((prev: ChatState) => ChatState)) => {
@@ -245,6 +335,28 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     },
     [onThreadChatStateChange],
   )
+
+  const refreshAgentContext = useCallback(async () => {
+    const listAgentContext = window.desktop?.listAgentContext
+    if (!listAgentContext) {
+      setAgentContext(null)
+      return
+    }
+
+    setAgentContextLoading(true)
+    try {
+      const result = await listAgentContext(activeProject.path)
+      setAgentContext(result.ok ? result : null)
+    } catch {
+      setAgentContext(null)
+    } finally {
+      setAgentContextLoading(false)
+    }
+  }, [activeProject.path])
+
+  useEffect(() => {
+    void refreshAgentContext()
+  }, [refreshAgentContext])
 
   useEffect(() => {
     isRunningRef.current = isRunning
@@ -295,6 +407,94 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     window.addEventListener(SETTINGS_CHANGED_EVENT, onSettingsChanged)
     return () => window.removeEventListener(SETTINGS_CHANGED_EVENT, onSettingsChanged)
   }, [applyGlobalModelFromSettings])
+
+  const activeComposerTrigger = useMemo(
+    () => getComposerTrigger(inputValue, composerSelection.start, composerSelection.end),
+    [composerSelection.end, composerSelection.start, inputValue],
+  )
+  const activeAutocompleteKey = activeComposerTrigger
+    ? `${activeComposerTrigger.kind}:${activeComposerTrigger.start}:${activeComposerTrigger.query}`
+    : ''
+  const composerSuggestions = useMemo(
+    () => buildComposerSuggestions(activeComposerTrigger, agentContext, fileMentionResults),
+    [activeComposerTrigger, agentContext, fileMentionResults],
+  )
+  const composerAutocompleteOpen =
+    Boolean(activeComposerTrigger) &&
+    activeAutocompleteKey !== dismissedAutocompleteKey &&
+    composerSuggestions.length > 0
+
+  useEffect(() => {
+    setComposerSuggestionIndex(0)
+  }, [activeAutocompleteKey])
+
+  useEffect(() => {
+    if (activeComposerTrigger?.kind !== 'mention') {
+      setFileMentionResults([])
+      return
+    }
+
+    const searchProjectFiles = window.desktop?.searchProjectFiles
+    if (!searchProjectFiles) {
+      setFileMentionResults([])
+      return
+    }
+
+    const query = activeComposerTrigger.query
+    const timer = window.setTimeout(() => {
+      searchProjectFiles(activeProject.path, query)
+        .then((result) => setFileMentionResults(result.ok ? result.items : []))
+        .catch(() => setFileMentionResults([]))
+    }, 90)
+
+    return () => window.clearTimeout(timer)
+  }, [activeComposerTrigger, activeProject.path])
+
+  useLayoutEffect(() => {
+    if (!composerAutocompleteOpen || !chatInputRef.current) {
+      setComposerAutocompleteBox(null)
+      return
+    }
+
+    const gap = 8
+    const pad = 8
+    const maxListPx = 320
+
+    const sync = () => {
+      const input = chatInputRef.current
+      if (!input) return
+      const composer = input.closest('.chat-composer') ?? input
+      const r = composer.getBoundingClientRect()
+      const width = Math.min(Math.max(r.width, 280), window.innerWidth - pad * 2)
+      let left = r.left
+      if (left + width > window.innerWidth - pad) left = window.innerWidth - pad - width
+      if (left < pad) left = pad
+      const bottom = window.innerHeight - r.top + gap
+      const maxHeight = Math.min(maxListPx, Math.max(120, r.top - pad - gap))
+      setComposerAutocompleteBox({ left, bottom, width, maxHeight })
+    }
+
+    sync()
+    window.addEventListener('resize', sync)
+    document.addEventListener('scroll', sync, true)
+    return () => {
+      window.removeEventListener('resize', sync)
+      document.removeEventListener('scroll', sync, true)
+    }
+  }, [composerAutocompleteOpen, composerSuggestions.length])
+
+  useEffect(() => {
+    if (!composerAutocompleteOpen) return
+    const onPointerDown = (event: MouseEvent) => {
+      const t = event.target as Node | null
+      if (!t) return
+      if (chatInputRef.current?.contains(t)) return
+      if (composerAutocompleteSurfaceRef.current?.contains(t)) return
+      setDismissedAutocompleteKey(activeAutocompleteKey)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [activeAutocompleteKey, composerAutocompleteOpen])
 
   const pickChatMenuRow = useCallback(async (row: ChatModelMenuRow) => {
     if (!window.claudeChat || isRunningRef.current) return
@@ -907,6 +1107,32 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     await window.claudeChat.cancel(activeRequestIdRef.current)
   }
 
+  const syncComposerSelection = useCallback(() => {
+    const input = chatInputRef.current
+    if (!input) return
+    setComposerSelection({ start: input.selectionStart, end: input.selectionEnd })
+  }, [])
+
+  const insertComposerSuggestion = useCallback(
+    (suggestion: ComposerSuggestion) => {
+      if (!activeComposerTrigger) return
+      const before = inputValue.slice(0, activeComposerTrigger.start)
+      const after = inputValue.slice(activeComposerTrigger.end)
+      const nextValue = `${before}${suggestion.insertText}${after}`
+      const nextCursor = before.length + suggestion.insertText.length
+      setInputValue(nextValue)
+      setDismissedAutocompleteKey('')
+      setComposerSelection({ start: nextCursor, end: nextCursor })
+      requestAnimationFrame(() => {
+        const input = chatInputRef.current
+        if (!input) return
+        input.focus()
+        input.setSelectionRange(nextCursor, nextCursor)
+      })
+    },
+    [activeComposerTrigger, inputValue],
+  )
+
   const handleFormSubmit = (event: FormEvent) => {
     event.preventDefault()
     if (isRunningRef.current) return
@@ -920,6 +1146,29 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
   }
 
   const handleInputKeydown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (composerAutocompleteOpen && composerSuggestions.length > 0) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setComposerSuggestionIndex((index) => (index + 1) % composerSuggestions.length)
+        return
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setComposerSuggestionIndex((index) => (index - 1 + composerSuggestions.length) % composerSuggestions.length)
+        return
+      }
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault()
+        insertComposerSuggestion(composerSuggestions[composerSuggestionIndex] ?? composerSuggestions[0])
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setDismissedAutocompleteKey(activeAutocompleteKey)
+        return
+      }
+    }
+
     if (event.key !== 'Enter' || event.shiftKey || isComposingText) return
     event.preventDefault()
     if (!isRunningRef.current) void submitPrompt(inputValue)
@@ -973,11 +1222,55 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
             autoComplete="off"
             spellCheck={false}
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => {
+              setInputValue(e.target.value)
+              setComposerSelection({ start: e.target.selectionStart, end: e.target.selectionEnd })
+              setDismissedAutocompleteKey('')
+            }}
             onCompositionStart={() => setIsComposingText(true)}
             onCompositionEnd={() => setIsComposingText(false)}
             onKeyDown={handleInputKeydown}
+            onKeyUp={syncComposerSelection}
+            onClick={syncComposerSelection}
+            onSelect={syncComposerSelection}
           />
+          {composerAutocompleteOpen && composerAutocompleteBox
+            ? createPortal(
+                <div
+                  ref={composerAutocompleteSurfaceRef}
+                  className="composer-autocomplete-popover"
+                  role="listbox"
+                  aria-label={activeComposerTrigger?.kind === 'slash' ? 'Slash commands' : 'Mentions'}
+                  style={{
+                    position: 'fixed',
+                    left: composerAutocompleteBox.left,
+                    bottom: composerAutocompleteBox.bottom,
+                    width: composerAutocompleteBox.width,
+                    maxHeight: composerAutocompleteBox.maxHeight,
+                  }}
+                >
+                  {composerSuggestions.map((suggestion, index) => (
+                    <button
+                      key={suggestion.id}
+                      type="button"
+                      role="option"
+                      aria-selected={index === composerSuggestionIndex}
+                      className={`composer-autocomplete-option${index === composerSuggestionIndex ? ' is-selected' : ''}`}
+                      onMouseEnter={() => setComposerSuggestionIndex(index)}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => insertComposerSuggestion(suggestion)}
+                    >
+                      <IconInline name={suggestion.kind === 'file' ? 'file' : suggestion.kind === 'agent' ? 'branch' : 'chip'} />
+                      <span className="composer-autocomplete-option__copy">
+                        <span>{suggestion.title}</span>
+                        <span>{suggestion.subtitle}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>,
+                document.body,
+              )
+            : null}
           <div className="composer-footer">
             <div className="composer-actions">
               {/* 关掉，需要再打开
@@ -1145,11 +1438,145 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                 )
               : null}
           </div>
+          <button
+            type="button"
+            className="chat-context-action"
+            title="刷新当前项目的 skills / agents"
+            disabled={agentContextLoading}
+            onClick={() => void refreshAgentContext()}
+          >
+            <IconInline name="chip" />
+            <span>
+              {agentContextLoading
+                ? '扫描中'
+                : `${agentContext?.skills.length ?? 0} skills / ${agentContext?.agents.length ?? 0} agents`}
+            </span>
+          </button>
         </div>
       </div>
     </section>
   )
 })
+
+function getComposerTrigger(value: string, selectionStart: number, selectionEnd: number): ComposerTrigger | null {
+  if (selectionStart !== selectionEnd) return null
+  const beforeCursor = value.slice(0, selectionStart)
+  const currentLineStart = beforeCursor.lastIndexOf('\n') + 1
+  const currentLine = beforeCursor.slice(currentLineStart)
+  const slashMatch = /^(\s*)\/([A-Za-z0-9_-]*)$/.exec(currentLine)
+  if (slashMatch) {
+    const slashOffset = currentLine.indexOf('/')
+    return {
+      kind: 'slash',
+      query: slashMatch[2] ?? '',
+      start: currentLineStart + slashOffset,
+      end: selectionStart,
+    }
+  }
+
+  const mentionMatch = /(^|[\s([{])@([^\s@]*)$/.exec(beforeCursor)
+  if (!mentionMatch) return null
+  return {
+    kind: 'mention',
+    query: mentionMatch[2] ?? '',
+    start: selectionStart - (mentionMatch[2]?.length ?? 0) - 1,
+    end: selectionStart,
+  }
+}
+
+function buildComposerSuggestions(
+  trigger: ComposerTrigger | null,
+  catalog: AgentContextCatalog | null,
+  fileResults: ProjectFileSearchItem[],
+): ComposerSuggestion[] {
+  if (!trigger) return []
+  if (trigger.kind === 'slash') return buildSlashSuggestions(trigger.query, catalog)
+  return buildMentionSuggestions(trigger.query, catalog, fileResults)
+}
+
+function buildSlashSuggestions(query: string, catalog: AgentContextCatalog | null): ComposerSuggestion[] {
+  const normalizedQuery = normalizeSuggestionQuery(query)
+  const builtIns: ComposerSuggestion[] = BUILT_IN_SLASH_COMMANDS.map((command) => ({
+    id: `slash-built-in-${command.command}`,
+    kind: 'slash',
+    title: `${command.title}${command.argumentHint ? ` ${command.argumentHint}` : ''}`,
+    subtitle: `Built-in · ${command.description}`,
+    insertText: `${command.title} `,
+    item: command,
+  }))
+
+  const skills: ComposerSuggestion[] = (catalog?.skills ?? []).map((skill) => ({
+    id: `slash-${skill.path}`,
+    kind: 'slash',
+    title: `${skill.title}${skill.argumentHint ? ` ${skill.argumentHint}` : ''}`,
+    subtitle: `${formatContextScope(skill.scope)} · ${formatContextSource(skill.source)} · ${skill.description || skill.relativePath}`,
+    insertText: `${skill.title} `,
+    item: skill,
+  }))
+
+  return builtIns
+    .concat(skills)
+    .filter((suggestion) =>
+      matchesSuggestion(normalizedQuery, suggestion.title, suggestion.subtitle, suggestion.insertText),
+    )
+    .slice(0, 14)
+}
+
+function buildMentionSuggestions(
+  query: string,
+  catalog: AgentContextCatalog | null,
+  fileResults: ProjectFileSearchItem[],
+): ComposerSuggestion[] {
+  const normalizedQuery = normalizeSuggestionQuery(query.replace(/^agent-/, ''))
+  const files: ComposerSuggestion[] = fileResults.map((file) => ({
+    id: `file-${file.path}`,
+    kind: 'file',
+    title: file.relativePath,
+    subtitle: file.type === 'directory' ? 'Directory' : 'File',
+    insertText: `${formatFileMention(file.relativePath)} `,
+    item: file,
+  }))
+
+  const agents: ComposerSuggestion[] = (catalog?.agents ?? []).map((agent) => ({
+    id: `agent-${agent.path}`,
+    kind: 'agent',
+    title: `@agent-${agent.name}`,
+    subtitle: `${formatContextScope(agent.scope)} · ${formatContextSource(agent.source)} · ${agent.description || agent.relativePath}`,
+    insertText: `@agent-${agent.name} `,
+    item: agent,
+  }))
+
+  return files
+    .concat(agents)
+    .filter((suggestion) =>
+      matchesSuggestion(normalizedQuery, suggestion.title, suggestion.subtitle, suggestion.insertText),
+    )
+    .slice(0, 14)
+}
+
+function matchesSuggestion(query: string, ...values: string[]): boolean {
+  if (!query) return true
+  return values.some((value) => normalizeSuggestionQuery(value).includes(query))
+}
+
+function normalizeSuggestionQuery(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function formatFileMention(relativePath: string): string {
+  if (!/[\s"']/u.test(relativePath)) return `@${relativePath}`
+  return `@"${relativePath.replace(/"/g, '\\"')}"`
+}
+
+function formatContextScope(scope: 'user' | 'project'): string {
+  return scope === 'user' ? 'User' : 'Project'
+}
+
+function formatContextSource(source: 'claude' | 'agent' | 'cursor'): string {
+  if (source === 'claude') return '.claude'
+  if (source === 'agent') return '.agent'
+  return '.cursor'
+}
 
 function renderMarkdown(markdown: string): string {
   const html = marked.parse(markdown, { async: false }) as string

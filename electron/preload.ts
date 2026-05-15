@@ -21,6 +21,12 @@ contextBridge.exposeInMainWorld('desktop', {
   listProjectFiles(rootPath: string) {
     return ipcRenderer.invoke('desktop:list-project-files', rootPath)
   },
+  searchProjectFiles(rootPath: string, query: string) {
+    return ipcRenderer.invoke('desktop:search-project-files', rootPath, query)
+  },
+  listAgentContext(rootPath: string) {
+    return ipcRenderer.invoke('desktop:list-agent-context', rootPath)
+  },
   getChatWorkspace() {
     return ipcRenderer.invoke('chat-workspace:get')
   },
