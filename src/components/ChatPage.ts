@@ -87,26 +87,36 @@ export class ChatPage implements AppView {
             ></textarea>
             <div class="composer-footer">
               <div class="composer-actions">
+                <!-- 关掉，需要再打开 -->
+                <!-- 
                 <button type="button" class="composer-icon-button" id="btn-attach" title="添加上下文" aria-label="添加上下文">${Icons.plus}</button>
                 <button type="button" class="composer-mode-button" title="权限模式：自动审查" aria-label="权限模式：自动审查">
                   ${Icons.shield}<span>自动审查</span>${Icons.chevron}
                 </button>
+                -->
               </div>
               <div class="composer-actions composer-actions--end">
                 <span class="composer-spinner" id="composer-spinner" aria-hidden="true"></span>
                 <button type="button" class="composer-model-button" title="模型" aria-label="模型">
                   <span id="composer-model">Claude Agent</span>${Icons.chevron}
                 </button>
+                <!-- 关掉，需要再打开 -->
+                <!--  
                 <button type="button" class="composer-icon-button" id="btn-dictate" title="语音输入" aria-label="语音输入">${Icons.mic}</button>
+                -->
                 <button type="submit" class="composer-send-button" id="btn-send" title="发送" aria-label="发送">${Icons.send}</button>
               </div>
             </div>
           </form>
+          
+          <!-- 关掉，需要再打开 -->
+          <!-- 
           <div class="chat-context-strip" aria-label="当前上下文">
             <span>${Icons.folder}<span>CodeX-UI-Template</span>${Icons.chevron}</span>
             <span>${Icons.laptop}<span>本地模式</span>${Icons.chevron}</span>
             <span>${Icons.branch}<span>main</span>${Icons.chevron}</span>
           </div>
+          -->
         </div>
         <div class="chat-suggestions" id="chat-suggestions" aria-label="建议提示">
           <button type="button" data-prompt="Replace electron-builder placeholders before the first packaged build ships wrong metadata">Replace electron-builder placeholders before the first packaged build ships wrong metadata</button>
