@@ -28,6 +28,25 @@ npm run dev
 
 开发模式下会启动 Vite 开发服务器并打开 Electron 窗口。
 
+## Claude Agent 配置
+
+Claude Agent SDK 放在 Electron 主进程中运行，所以环境变量写在项目根目录的 `.env.local`，不要写成 `VITE_*` 渲染层变量。可以从 `.env.example` 复制一份：
+
+```bash
+cp .env.example .env.local
+```
+
+可用变量：
+
+| 变量 | 说明 |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | Claude API Key |
+| `ANTHROPIC_BASE_URL` | 自定义 Anthropic 兼容 Base URL |
+| `ANTHROPIC_MODEL` | 默认模型，会传给 Claude Agent SDK 的 `model` 选项 |
+| `ANTHROPIC_AUTH_TOKEN` | 可选，使用 token 鉴权时替代 API Key |
+
+应用内也可以在「设置」页填写 API Key、Base URL、Model，并选择「设置页优先」或「环境变量」。默认是设置页优先：表单里的非空值会覆盖同名环境变量，空字段继续沿用 `.env.local` / 系统环境变量。
+
 ## 脚本说明
 
 | 命令 | 说明 |
@@ -45,7 +64,9 @@ npm run dev
 │   ├── main.ts         # 窗口创建、生命周期
 │   └── preload.ts      # contextBridge 暴露 API
 ├── src/                # 渲染进程
-│   ├── main.ts         # 入口与 Shell UI
+│   ├── main.ts         # 入口
+│   ├── components/     # AppShell / Chat / Docs / Settings 组件
+│   ├── icons.ts        # 统一 SVG icon 出口
 │   ├── style.css
 │   ├── counter.ts      # 示例交互
 │   └── window-safe-area.ts

@@ -1,6 +1,10 @@
-import { app, BrowserWindow, nativeTheme } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { ClaudeAgentRunner } from './claude-agent-runner'
+import { ClaudeAgentSettingsStore } from './claude-agent-settings'
+import { loadMainProcessEnv } from './env-loader'
+import type { ClaudeAgentSettings, ClaudeChatSubmitPayload } from '../src/claude-chat-types'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -14,6 +18,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // │ │ └── preload.mjs
 // │
 process.env.APP_ROOT = path.join(__dirname, '..')
+loadMainProcessEnv(process.env.APP_ROOT)
 
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
@@ -23,6 +28,8 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
 let win: BrowserWindow | null
+let claudeAgentRunner: ClaudeAgentRunner | null = null
+let claudeAgentSettingsStore: ClaudeAgentSettingsStore | null = null
 
 function getWindowBackgroundColor() {
   return nativeTheme.shouldUseDarkColors ? '#181818' : '#f9f9f9'
@@ -53,6 +60,8 @@ function createWindow() {
       : {}),
   })
 
+  claudeAgentRunner = new ClaudeAgentRunner(win.webContents, process.env.APP_ROOT, () => getClaudeAgentSettingsStore().resolve())
+
   if (!isMac) {
     const syncBackgroundColor = () => {
       win?.setBackgroundColor(getWindowBackgroundColor())
@@ -63,9 +72,8 @@ function createWindow() {
     })
   }
 
-  // Test active push message to Renderer-process.
-  win.webContents.on('did-finish-load', () => {
-    win?.webContents.send('main-process-message', (new Date).toLocaleString())
+  win.on('closed', () => {
+    claudeAgentRunner = null
   })
 
   if (VITE_DEV_SERVER_URL) {
@@ -74,6 +82,20 @@ function createWindow() {
     // win.loadFile('dist/index.html')
     win.loadFile(path.join(RENDERER_DIST, 'index.html'))
   }
+}
+
+function getClaudeAgentRunner() {
+  if (!claudeAgentRunner) {
+    throw new Error('Claude Agent runner is not ready.')
+  }
+  return claudeAgentRunner
+}
+
+function getClaudeAgentSettingsStore() {
+  if (!claudeAgentSettingsStore) {
+    throw new Error('Claude Agent settings store is not ready.')
+  }
+  return claudeAgentSettingsStore
 }
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -96,5 +118,21 @@ app.on('activate', () => {
 
 app.whenReady().then(() => {
   nativeTheme.themeSource = 'system'
+  claudeAgentSettingsStore = new ClaudeAgentSettingsStore(app.getPath('userData'))
+  ipcMain.handle('claude-chat:submit', (_event, payload: ClaudeChatSubmitPayload) => {
+    return getClaudeAgentRunner().submit(payload)
+  })
+  ipcMain.handle('claude-chat:cancel', (_event, requestId?: string) => {
+    return getClaudeAgentRunner().cancel(requestId)
+  })
+  ipcMain.handle('claude-chat:new-thread', () => {
+    return getClaudeAgentRunner().newThread()
+  })
+  ipcMain.handle('claude-agent-settings:get', () => {
+    return getClaudeAgentSettingsStore().getSnapshot()
+  })
+  ipcMain.handle('claude-agent-settings:save', (_event, settings: ClaudeAgentSettings) => {
+    return getClaudeAgentSettingsStore().save(settings)
+  })
   createWindow()
 })
