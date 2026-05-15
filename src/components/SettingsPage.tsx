@@ -163,7 +163,6 @@ export function SettingsPage({ hidden, settingsCategory }: SettingsPageProps) {
     return (
       <section className="app-main-inner settings-page" id="panel-settings" aria-hidden={false}>
         <header className="settings-page-header">
-          <div className="app-main-eyebrow">设置</div>
           <h1 className="app-main-heading">外观</h1>
           <p className="settings-lede">该分类尚未接入，后续可在此配置主题、字体与窗口效果等选项。</p>
         </header>
@@ -174,7 +173,6 @@ export function SettingsPage({ hidden, settingsCategory }: SettingsPageProps) {
   return (
     <section className="app-main-inner settings-page" id="panel-settings" aria-hidden={false}>
       <header className="settings-page-header">
-        <div className="app-main-eyebrow">设置</div>
         <h1 className="app-main-heading">Claude Agent</h1>
         <p className="settings-lede">
           在此处填写多条模型厂商配置。真正用于对话请求的条目须在聊天输入框旁的模型菜单中切换；条目中的 API Key、Base URL、Model 会与所选条目对齐。
