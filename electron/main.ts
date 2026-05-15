@@ -1,8 +1,9 @@
-import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { ClaudeAgentRunner } from './claude-agent-runner'
 import { ClaudeAgentSettingsStore } from './claude-agent-settings'
+import { ChatWorkspaceStore } from './chat-workspace-store'
 import { loadMainProcessEnv } from './env-loader'
 import type {
   ActiveChatPickPayload,
@@ -34,6 +35,7 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 let win: BrowserWindow | null
 let claudeAgentRunner: ClaudeAgentRunner | null = null
 let claudeAgentSettingsStore: ClaudeAgentSettingsStore | null = null
+let chatWorkspaceStore: ChatWorkspaceStore | null = null
 
 function getWindowBackgroundColor() {
   return nativeTheme.shouldUseDarkColors ? '#181818' : '#f9f9f9'
@@ -102,6 +104,13 @@ function getClaudeAgentSettingsStore() {
   return claudeAgentSettingsStore
 }
 
+function getChatWorkspaceStore() {
+  if (!chatWorkspaceStore) {
+    throw new Error('Chat workspace store is not ready.')
+  }
+  return chatWorkspaceStore
+}
+
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
@@ -122,7 +131,9 @@ app.on('activate', () => {
 
 app.whenReady().then(() => {
   nativeTheme.themeSource = 'system'
-  claudeAgentSettingsStore = new ClaudeAgentSettingsStore(app.getPath('userData'))
+  const userDataPath = app.getPath('userData')
+  claudeAgentSettingsStore = new ClaudeAgentSettingsStore(userDataPath)
+  chatWorkspaceStore = new ChatWorkspaceStore(userDataPath)
   ipcMain.handle('claude-chat:submit', (_event, payload: ClaudeChatSubmitPayload) => {
     return getClaudeAgentRunner().submit(payload)
   })
@@ -140,6 +151,22 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('claude-agent-settings:set-active-chat-pick', (_event, payload: ActiveChatPickPayload) => {
     return getClaudeAgentSettingsStore().setActiveChatPick(payload)
+  })
+  ipcMain.handle('chat-workspace:get', () => {
+    return getChatWorkspaceStore().read()
+  })
+  ipcMain.handle('chat-workspace:save', (_event, state: unknown) => {
+    return getChatWorkspaceStore().save(state)
+  })
+  ipcMain.handle('desktop:pick-project-directory', async () => {
+    const parent = BrowserWindow.getFocusedWindow() ?? win
+    if (!parent) return null
+    const result = await dialog.showOpenDialog(parent, {
+      properties: ['openDirectory', 'createDirectory'],
+      title: '选择项目文件夹',
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0] ?? null
   })
   createWindow()
 })

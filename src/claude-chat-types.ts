@@ -61,6 +61,8 @@ export type ClaudeChatSubmitResult = {
   requestId: string
 }
 
+export type ClaudeChatActivityStatus = 'running' | 'done' | 'error' | 'info'
+
 export type ClaudeChatEvent =
   | {
       type: 'session_start'
@@ -68,12 +70,34 @@ export type ClaudeChatEvent =
       sessionId: string
       model: string
       cwd: string
+      tools: string[]
+      skills: string[]
+      mcpServers: { name: string; status: string }[]
+      permissionMode: string
+      plugins: string[]
     }
   | {
       type: 'assistant_delta'
       requestId: string
       messageId: string
       text: string
+    }
+  | {
+      type: 'thinking_start'
+      requestId: string
+      thinkingId: string
+      title: string
+    }
+  | {
+      type: 'thinking_delta'
+      requestId: string
+      thinkingId: string
+      text: string
+    }
+  | {
+      type: 'thinking_done'
+      requestId: string
+      thinkingId: string
     }
   | {
       type: 'tool_start'
@@ -83,10 +107,27 @@ export type ClaudeChatEvent =
       inputPreview: string
     }
   | {
+      type: 'tool_update'
+      requestId: string
+      toolUseId: string
+      inputPreview?: string
+      detail?: string
+    }
+  | {
       type: 'tool_done'
       requestId: string
       toolUseId: string
       status: 'done' | 'error' | 'denied'
+      detail?: string
+    }
+  | {
+      type: 'agent_activity'
+      requestId: string
+      activityId: string
+      title: string
+      status: ClaudeChatActivityStatus
+      detail?: string
+      preview?: string
     }
   | {
       type: 'result'

@@ -21,8 +21,11 @@ import type {
 } from '../claude-chat-types'
 import { IconInline } from '../icon-inline'
 import type {
+  ActivityStatus,
+  ChatActivityItem,
   ChatMessageItem,
   ChatState,
+  ChatThinkingItem,
   ChatToolItem,
   ToolStatus,
   TranscriptItem,
@@ -50,7 +53,7 @@ type ChatPageProps = {
   onStatusChange: (text: string) => void
   onNewThread: () => void
   onSelectProject: (projectId: string) => void
-  onCreateProject: (mode: 'scratch' | 'existing') => void
+  onCreateProject: (mode: 'scratch' | 'existing') => void | Promise<void>
   onThreadChatStateChange: (threadId: string, update: ChatState | ((prev: ChatState) => ChatState)) => void
   onThreadPromptSubmit: (threadId: string, prompt: string) => void
 }
@@ -96,7 +99,41 @@ function ToolRow({ item }: { item: ChatToolItem }) {
       <span className="tool-row__dot" />
       <span className="tool-row__name">{item.name}</span>
       <span className="tool-row__status">{statusLabel[item.status]}</span>
+      {item.detail ? <span className="tool-row__detail">{item.detail}</span> : null}
       {item.inputPreview ? <code>{item.inputPreview}</code> : null}
+    </div>
+  )
+}
+
+function ThinkingRow({ item }: { item: ChatThinkingItem }) {
+  return (
+    <div className={`thinking-row thinking-row--${item.status}`}>
+      <div className="thinking-row__header">
+        <span className="thinking-row__dot" />
+        <span className="thinking-row__title">{item.title}</span>
+        <span className="thinking-row__status">{item.status === 'running' ? '思考中' : '完成'}</span>
+      </div>
+      {item.content ? <pre>{item.content}</pre> : null}
+    </div>
+  )
+}
+
+function ActivityRow({ item }: { item: ChatActivityItem }) {
+  const statusLabel: Record<ActivityStatus, string> = {
+    done: '完成',
+    error: '出错',
+    info: '状态',
+    running: '进行中',
+  }
+  return (
+    <div className={`activity-row activity-row--${item.status}`}>
+      <div className="activity-row__main">
+        <span className="activity-row__dot" />
+        <span className="activity-row__title">{item.title}</span>
+        <span className="activity-row__status">{statusLabel[item.status]}</span>
+        {item.detail ? <span className="activity-row__detail">{item.detail}</span> : null}
+      </div>
+      {item.preview ? <pre>{item.preview}</pre> : null}
     </div>
   )
 }
@@ -125,11 +162,15 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
   const [projectPickerOpen, setProjectPickerOpen] = useState(false)
   const [modelMenuRows, setModelMenuRows] = useState<ChatModelMenuRow[]>([])
   const [modelMenuSelectionKey, setModelMenuSelectionKey] = useState('')
+  /** 与 Electron claude-agent-settings 对齐，composer 仅展示此项 */
+  const [globalDisplayModel, setGlobalDisplayModel] = useState('Claude Agent')
 
   const scrollRegionRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const modelPickerRef = useRef<HTMLDivElement>(null)
   const projectPickerRef = useRef<HTMLDivElement>(null)
+  const projectPopoverAnchorRef = useRef<HTMLButtonElement>(null)
+  const projectPopoverSurfaceRef = useRef<HTMLDivElement>(null)
   const modelPopoverAnchorRef = useRef<HTMLButtonElement>(null)
   const modelPopoverSurfaceRef = useRef<HTMLDivElement>(null)
   const activeThreadIdRef = useRef(activeThread.id)
@@ -142,11 +183,18 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     width: number
     maxHeight: number
   } | null>(null)
+  const [projectPopoverBox, setProjectPopoverBox] = useState<{
+    left: number
+    bottom: number
+    width: number
+    maxHeight: number
+  } | null>(null)
   const scrollIntentRef = useRef<'none' | 'force-bottom'>('none')
   const isFirstTranscriptLayoutRef = useRef(true)
   const isRunningRef = useRef(false)
   const activeRequestIdRef = useRef<string | undefined>(undefined)
   const activeAssistantMessageIdRef = useRef<string | undefined>(undefined)
+  const globalDisplayModelRef = useRef(globalDisplayModel)
 
   const hasMessages = chatState.items.length > 0
   const setThreadChatState = useCallback(
@@ -155,16 +203,31 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     },
     [onThreadChatStateChange],
   )
-  const setActiveChatState = useCallback(
-    (update: ChatState | ((prev: ChatState) => ChatState)) => {
-      setThreadChatState(activeThreadIdRef.current, update)
-    },
-    [setThreadChatState],
-  )
 
   useEffect(() => {
     isRunningRef.current = isRunning
   }, [isRunning])
+
+  useEffect(() => {
+    globalDisplayModelRef.current = globalDisplayModel
+  }, [globalDisplayModel])
+
+  const applyGlobalModelFromSettings = useCallback(
+    (snapshot: ClaudeAgentSettingsSnapshot) => {
+      const settings = snapshot.settings
+
+      setModelMenuRows(buildChatModelMenuRows(settings.providers))
+      setModelMenuSelectionKey(pickerSelectionKeyFromSettings(settings))
+
+      const model = resolvedChatDisplayModel(settings)
+      setGlobalDisplayModel(model)
+
+      if (!isRunningRef.current) {
+        onStatusChange(compactModelName(model))
+      }
+    },
+    [onStatusChange],
+  )
 
   useEffect(() => {
     activeThreadIdRef.current = activeThread.id
@@ -173,32 +236,23 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     setShowScrollButton(false)
     setModelPickerOpen(false)
     setProjectPickerOpen(false)
-  }, [activeThread.id])
+
+    window.claudeChat?.getSettings().then(applyGlobalModelFromSettings).catch(() => {
+      /* Browser preview can run without the Electron bridge. */
+    })
+  }, [activeThread.id, applyGlobalModelFromSettings])
 
   useEffect(() => {
-    const applySettingsModel = (snapshot: ClaudeAgentSettingsSnapshot) => {
-      if (isRunningRef.current) return
-      const settings = snapshot.settings
-
-      setModelMenuRows(buildChatModelMenuRows(settings.providers))
-      setModelMenuSelectionKey(pickerSelectionKeyFromSettings(settings))
-
-      const model = resolvedChatDisplayModel(settings)
-
-      setActiveChatState((prev) => ({ ...prev, model }))
-      onStatusChange(compactModelName(model))
-    }
-
-    window.claudeChat?.getSettings().then(applySettingsModel).catch(() => {
+    window.claudeChat?.getSettings().then(applyGlobalModelFromSettings).catch(() => {
       /* Browser preview can run without the Electron bridge. */
     })
 
     const onSettingsChanged = (event: Event) => {
-      applySettingsModel((event as CustomEvent<ClaudeAgentSettingsSnapshot>).detail)
+      applyGlobalModelFromSettings((event as CustomEvent<ClaudeAgentSettingsSnapshot>).detail)
     }
     window.addEventListener(SETTINGS_CHANGED_EVENT, onSettingsChanged)
     return () => window.removeEventListener(SETTINGS_CHANGED_EVENT, onSettingsChanged)
-  }, [onStatusChange, setActiveChatState])
+  }, [applyGlobalModelFromSettings])
 
   const pickChatMenuRow = useCallback(async (row: ChatModelMenuRow) => {
     if (!window.claudeChat || isRunningRef.current) return
@@ -249,6 +303,38 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     }
   }, [modelPickerOpen, modelMenuRows.length])
 
+  useLayoutEffect(() => {
+    if (!projectPickerOpen || !projectPopoverAnchorRef.current) {
+      setProjectPopoverBox(null)
+      return
+    }
+    const gap = 6
+    const pad = 8
+    const maxListPx = 360
+
+    const sync = () => {
+      const anchor = projectPopoverAnchorRef.current
+      if (!anchor) return
+      const r = anchor.getBoundingClientRect()
+      const spaceAbove = r.top - pad
+      const maxH = Math.min(maxListPx, Math.max(120, spaceAbove))
+      const width = Math.min(320, window.innerWidth - pad * 2)
+      let left = r.left
+      if (left + width > window.innerWidth - pad) left = window.innerWidth - pad - width
+      if (left < pad) left = pad
+      const bottom = window.innerHeight - r.top + gap
+      setProjectPopoverBox({ left, bottom, width, maxHeight: maxH })
+    }
+
+    sync()
+    window.addEventListener('resize', sync)
+    document.addEventListener('scroll', sync, true)
+    return () => {
+      window.removeEventListener('resize', sync)
+      document.removeEventListener('scroll', sync, true)
+    }
+  }, [projectPickerOpen, projects.length])
+
   useEffect(() => {
     if (!modelPickerOpen) return
     const onPointerDown = (event: MouseEvent) => {
@@ -275,6 +361,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       const t = event.target as Node | null
       if (!t) return
       if (projectPickerRef.current?.contains(t)) return
+      if (projectPopoverSurfaceRef.current?.contains(t)) return
       setProjectPickerOpen(false)
     }
     const onKeyDown = (event: WindowEventMap['keydown']) => {
@@ -384,10 +471,9 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         setThreadChatState(eventThreadId, (prev) => ({
           ...prev,
           sessionId: event.sessionId,
-          model: event.model || 'Claude Agent',
+          model: event.model || globalDisplayModelRef.current,
           cwd: event.cwd,
         }))
-        onStatusChange(compactModelName(event.model || 'Claude Agent'))
         return
       }
 
@@ -425,13 +511,69 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         return
       }
 
+      if (event.type === 'thinking_start') {
+        setThreadChatState(eventThreadId, (prev) => {
+          const idx = prev.items.findIndex((it) => it.type === 'thinking' && it.thinkingId === event.thinkingId)
+          if (idx >= 0) {
+            const next = [...prev.items]
+            const it = next[idx] as ChatThinkingItem
+            next[idx] = { ...it, status: 'running' }
+            return { ...prev, items: next }
+          }
+          const row: ChatThinkingItem = {
+            type: 'thinking',
+            id: event.thinkingId,
+            thinkingId: event.thinkingId,
+            title: event.title,
+            content: '',
+            status: 'running',
+          }
+          return { ...prev, items: [...prev.items, row] }
+        })
+        return
+      }
+
+      if (event.type === 'thinking_delta') {
+        setThreadChatState(eventThreadId, (prev) => {
+          const idx = prev.items.findIndex((it) => it.type === 'thinking' && it.thinkingId === event.thinkingId)
+          if (idx >= 0) {
+            const next = [...prev.items]
+            const it = next[idx] as ChatThinkingItem
+            next[idx] = { ...it, content: it.content + event.text, status: 'running' }
+            return { ...prev, items: next }
+          }
+          const row: ChatThinkingItem = {
+            type: 'thinking',
+            id: event.thinkingId,
+            thinkingId: event.thinkingId,
+            title: 'Think',
+            content: event.text,
+            status: 'running',
+          }
+          return { ...prev, items: [...prev.items, row] }
+        })
+        return
+      }
+
+      if (event.type === 'thinking_done') {
+        setThreadChatState(eventThreadId, (prev) => {
+          const idx = prev.items.findIndex((it) => it.type === 'thinking' && it.thinkingId === event.thinkingId)
+          if (idx < 0) return prev
+          const next = [...prev.items]
+          const it = next[idx] as ChatThinkingItem
+          next[idx] = { ...it, status: 'done' }
+          return { ...prev, items: next }
+        })
+        return
+      }
+
       if (event.type === 'tool_start') {
         setThreadChatState(eventThreadId, (prev) => {
           const existingIdx = prev.items.findIndex((it) => it.type === 'tool' && it.toolUseId === event.toolUseId)
           if (existingIdx >= 0) {
             const next = [...prev.items]
             const it = next[existingIdx] as ChatToolItem
-            next[existingIdx] = { ...it, status: 'running' }
+            next[existingIdx] = { ...it, inputPreview: event.inputPreview || it.inputPreview, status: 'running' }
             return { ...prev, items: next }
           }
           const row: ChatToolItem = {
@@ -447,20 +589,63 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         return
       }
 
+      if (event.type === 'tool_update') {
+        setThreadChatState(eventThreadId, (prev) => {
+          const idx = prev.items.findIndex((it) => it.type === 'tool' && it.toolUseId === event.toolUseId)
+          if (idx < 0) return prev
+          const next = [...prev.items]
+          const it = next[idx] as ChatToolItem
+          next[idx] = {
+            ...it,
+            inputPreview: event.inputPreview ?? it.inputPreview,
+            detail: event.detail ?? it.detail,
+          }
+          return { ...prev, items: next }
+        })
+        return
+      }
+
       if (event.type === 'tool_done') {
         setThreadChatState(eventThreadId, (prev) => {
           const idx = prev.items.findIndex((it) => it.type === 'tool' && it.toolUseId === event.toolUseId)
           if (idx < 0) return prev
           const next = [...prev.items]
           const it = next[idx] as ChatToolItem
-          next[idx] = { ...it, status: event.status }
+          next[idx] = { ...it, status: event.status, detail: event.detail ?? it.detail }
           return { ...prev, items: next }
         })
         return
       }
 
+      if (event.type === 'agent_activity') {
+        setThreadChatState(eventThreadId, (prev) => {
+          const idx = prev.items.findIndex((it) => it.type === 'activity' && it.id === event.activityId)
+          if (idx >= 0) {
+            const next = [...prev.items]
+            const it = next[idx] as ChatActivityItem
+            next[idx] = {
+              ...it,
+              title: event.title,
+              status: event.status,
+              detail: event.detail,
+              preview: event.preview,
+            }
+            return { ...prev, items: next }
+          }
+          const row: ChatActivityItem = {
+            type: 'activity',
+            id: event.activityId,
+            title: event.title,
+            status: event.status,
+            detail: event.detail,
+            preview: event.preview,
+          }
+          return { ...prev, items: [...prev.items, row] }
+        })
+        return
+      }
+
       if (event.type === 'result') {
-        let modelLabel = 'Claude Agent'
         flushSync(() => {
           setThreadChatState(eventThreadId, (prev) => {
             const expectedId = `assistant-${event.requestId}`
@@ -472,12 +657,10 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                 !item.content.trim() && event.result.trim() ? event.result : item.content
               return { ...item, content, status: 'done' }
             })
-            const next = { ...prev, sessionId: event.sessionId, items }
-            modelLabel = next.model
-            return next
+            return { ...prev, sessionId: event.sessionId, items }
           })
         })
-        finishRequest(event.requestId, compactModelName(modelLabel))
+        finishRequest(event.requestId, compactModelName(globalDisplayModelRef.current))
         return
       }
 
@@ -551,7 +734,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       activeAssistantMessageIdRef.current = undefined
       isRunningRef.current = false
       setIsRunning(false)
-      onStatusChange('Claude Agent')
+      onStatusChange(compactModelName(globalDisplayModelRef.current))
       setInputValue('')
       requestAnimationFrame(() => chatInputRef.current?.focus())
     },
@@ -692,9 +875,12 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       </div>
       <div className="chat-scroll-region" id="chat-scroll-region" ref={scrollRegionRef} hidden={!hasMessages}>
         <div className="chat-transcript" id="chat-transcript" aria-live="polite">
-          {chatState.items.map((item) =>
-            item.type === 'tool' ? <ToolRow key={item.id} item={item} /> : <ChatMessage key={item.id} item={item} />,
-          )}
+          {chatState.items.map((item) => {
+            if (item.type === 'tool') return <ToolRow key={item.id} item={item} />
+            if (item.type === 'thinking') return <ThinkingRow key={item.id} item={item} />
+            if (item.type === 'activity') return <ActivityRow key={item.id} item={item} />
+            return <ChatMessage key={item.id} item={item} />
+          })}
         </div>
       </div>
       <button
@@ -758,7 +944,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                     setModelPickerOpen((open) => !open)
                   }}
                 >
-                  <span id="composer-model">{compactModelName(chatState.model)}</span>
+                  <span id="composer-model">{compactModelName(globalDisplayModel)}</span>
                   <IconInline name="chevron" />
                 </button>
                 {modelPickerOpen && modelMenuRows.length > 0 && modelPopoverBox
@@ -821,6 +1007,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         <div className="chat-context-strip" aria-label="当前上下文">
           <div className="chat-project-picker" ref={projectPickerRef}>
             <button
+              ref={projectPopoverAnchorRef}
               type="button"
               className={`chat-project-trigger${projectPickerOpen ? ' is-open' : ''}`}
               aria-haspopup="menu"
@@ -832,8 +1019,21 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
               <span>{activeProject.name}</span>
               <IconInline name="chevron" />
             </button>
-            {projectPickerOpen ? (
-              <div className="chat-project-popover" role="menu" aria-label="项目">
+            {projectPickerOpen && projectPopoverBox
+              ? createPortal(
+                  <div
+                    ref={projectPopoverSurfaceRef}
+                    className="chat-project-popover"
+                    role="menu"
+                    aria-label="项目"
+                    style={{
+                      position: 'fixed',
+                      left: projectPopoverBox.left,
+                      bottom: projectPopoverBox.bottom,
+                      width: projectPopoverBox.width,
+                      maxHeight: projectPopoverBox.maxHeight,
+                    }}
+                  >
                 <div className="chat-project-popover-title">项目</div>
                 <div className="chat-project-options">
                   {projects.map((project) => {
@@ -865,22 +1065,8 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                   role="menuitem"
                   className="chat-project-option"
                   onClick={() => {
-                    onCreateProject('scratch')
                     setProjectPickerOpen(false)
-                  }}
-                >
-                  <IconInline name="plus" />
-                  <span className="chat-project-option-copy">
-                    <span>创建一个新的本地项目</span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="chat-project-option"
-                  onClick={() => {
-                    onCreateProject('existing')
-                    setProjectPickerOpen(false)
+                    void onCreateProject('existing')
                   }}
                 >
                   <IconInline name="folder" />
@@ -889,8 +1075,10 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                     <span>把文件夹加入项目列表</span>
                   </span>
                 </button>
-              </div>
-            ) : null}
+                  </div>,
+                  document.body,
+                )
+              : null}
           </div>
           <button type="button" className="chat-context-action" onClick={onNewThread}>
             <IconInline name="plus" />

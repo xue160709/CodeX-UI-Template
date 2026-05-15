@@ -15,6 +15,15 @@ contextBridge.exposeInMainWorld('desktop', {
   windowEffects: {
     macVibrancy: process.platform === 'darwin',
   },
+  pickProjectDirectory() {
+    return ipcRenderer.invoke('desktop:pick-project-directory') as Promise<string | null>
+  },
+  getChatWorkspace() {
+    return ipcRenderer.invoke('chat-workspace:get')
+  },
+  saveChatWorkspace(state: unknown) {
+    return ipcRenderer.invoke('chat-workspace:save', state)
+  },
 })
 
 contextBridge.exposeInMainWorld('ipcRenderer', {

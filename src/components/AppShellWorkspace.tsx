@@ -17,7 +17,7 @@ type AppShellWorkspaceProps = {
   onStatusChange: (text: string) => void
   onNewThread: () => void
   onSelectProject: (projectId: string) => void
-  onCreateProject: (mode: 'scratch' | 'existing') => void
+  onCreateProject: (mode: 'scratch' | 'existing') => void | Promise<void>
   onThreadChatStateChange: (threadId: string, update: ChatState | ((prev: ChatState) => ChatState)) => void
   onThreadPromptSubmit: (threadId: string, prompt: string) => void
 }
@@ -51,10 +51,10 @@ export function AppShellWorkspace({
           </span>
           <div className="app-workspace-drag-gap draggable" aria-hidden="true" />
           <div className="app-workspace-actions no-drag">
-            <button type="button" className="btn btn-ghost" id="btn-new-thread" onClick={onNewThread}>
+            {/* <button type="button" className="btn btn-ghost" id="btn-new-thread" onClick={onNewThread}>
               <IconInline name="plus" />
               <span>新对话</span>
-            </button>
+            </button> */}
           </div>
         </header>
       )}

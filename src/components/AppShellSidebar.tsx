@@ -119,7 +119,7 @@ export function AppShellSidebar({
           <div className="app-sidebar-inner">
             {isSettingsSidebar ? (
               <>
-                <button type="button" className="app-settings-back-btn" id="btn-settings-back-app" onClick={goLeaveSettings}>
+                <button type="button" className="app-sidebar-new-thread" id="btn-settings-back-app" onClick={goLeaveSettings}>
                   <IconInline name="back" />
                   <span>返回应用</span>
                 </button>
@@ -221,21 +221,23 @@ export function AppShellSidebar({
                                 >
                                   <span className="app-thread-title">{thread.title}</span>
                                 </button>
-                                <span className="app-thread-time" aria-label={`最后聊天时间 ${formatThreadTime(thread.updatedAt)}`}>
-                                  {formatThreadTime(thread.updatedAt)}
-                                </span>
-                                <button
-                                  type="button"
-                                  className={`app-thread-archive${isConfirming ? ' is-confirming' : ''}`}
-                                  title={isConfirming ? '确认归档' : '归档'}
-                                  aria-label={isConfirming ? `确认归档 ${thread.title}` : `归档 ${thread.title}`}
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    requestArchive(thread.id)
-                                  }}
-                                >
-                                  {isConfirming ? <span>确认</span> : <IconInline name="trash" />}
-                                </button>
+                                <div className="app-thread-trailing">
+                                  <span className="app-thread-time" aria-label={`最后聊天时间 ${formatThreadTime(thread.updatedAt)}`}>
+                                    {formatThreadTime(thread.updatedAt)}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className={`app-thread-archive${isConfirming ? ' is-confirming' : ''}`}
+                                    title={isConfirming ? '确认归档' : '归档'}
+                                    aria-label={isConfirming ? `确认归档 ${thread.title}` : `归档 ${thread.title}`}
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      requestArchive(thread.id)
+                                    }}
+                                  >
+                                    {isConfirming ? <span>确认</span> : <IconInline name="trash" />}
+                                  </button>
+                                </div>
                               </div>
                             )
                           })}

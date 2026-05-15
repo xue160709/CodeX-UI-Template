@@ -5,6 +5,8 @@ export type SettingsCategoryId = 'general' | 'appearance'
 
 export type MessageStatus = 'done' | 'streaming' | 'error' | 'cancelled'
 export type ToolStatus = 'running' | 'done' | 'error' | 'denied'
+export type ThinkingStatus = 'running' | 'done'
+export type ActivityStatus = 'running' | 'done' | 'error' | 'info'
 
 export type ChatMessageItem = {
   type: 'message'
@@ -21,9 +23,28 @@ export type ChatToolItem = {
   name: string
   inputPreview: string
   status: ToolStatus
+  detail?: string
 }
 
-export type TranscriptItem = ChatMessageItem | ChatToolItem
+export type ChatThinkingItem = {
+  type: 'thinking'
+  id: string
+  thinkingId: string
+  title: string
+  content: string
+  status: ThinkingStatus
+}
+
+export type ChatActivityItem = {
+  type: 'activity'
+  id: string
+  title: string
+  status: ActivityStatus
+  detail?: string
+  preview?: string
+}
+
+export type TranscriptItem = ChatMessageItem | ChatToolItem | ChatThinkingItem | ChatActivityItem
 
 export type ChatState = {
   sessionId?: string
