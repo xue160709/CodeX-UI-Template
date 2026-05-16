@@ -65,7 +65,7 @@ export function AppShellWorkspace({
         <div className="app-workspace-top-drag draggable" aria-hidden />
       ) : (
         <header className="app-workspace-header" role="banner">
-          <span className="app-workspace-title no-drag" id="workspace-title">
+          <span className="app-workspace-title no-drag" id="workspace-title" title={workspaceTitle}>
             {workspaceTitle}
           </span>
           <div className="app-workspace-drag-gap draggable" aria-hidden="true" />

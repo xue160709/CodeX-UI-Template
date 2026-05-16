@@ -741,8 +741,14 @@ export function AppShell() {
 
   const workspaceTitle = useMemo(() => {
     if (activeViewId === 'settings') return t(settingsWorkspaceTitleKey(settingsCategory))
+    if (activeViewId === 'home') {
+      const projectName = activeProject?.name.trim()
+      const threadTitle = activeThread?.title.trim()
+      if (projectName && threadTitle) return `${projectName} · ${threadTitle}`
+      if (projectName) return projectName
+    }
     return t(VIEW_HEADING_KEYS[activeViewId])
-  }, [activeViewId, settingsCategory, t])
+  }, [activeProject?.name, activeThread?.title, activeViewId, settingsCategory, t])
 
   if (!chatWorkspace || !activeProject) {
     return null
