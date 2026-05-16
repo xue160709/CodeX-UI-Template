@@ -1628,15 +1628,6 @@ button.app-file-tree-row {
   align-items: stretch;
 }
 
-.settings-provider-row::before {
-  content: '';
-  position: absolute;
-  inset: calc(var(--spacing) * 2) auto calc(var(--spacing) * 2) 0;
-  width: 2px;
-  border-radius: var(--radius-full);
-  background: transparent;
-}
-
 .settings-provider-accordion.is-expanded .settings-provider-row {
   background: color-mix(in oklab, var(--color-token-list-active-selection-background) 66%, transparent);
 }
