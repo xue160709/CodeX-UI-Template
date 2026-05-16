@@ -46,6 +46,8 @@
     "unpinThreadAria": "取消置顶 {{title}}",
     "pinThreadAria": "置顶 {{title}}",
     "lastChatAria": "最后聊天时间 {{time}}",
+    "threadRunning": "Agent 运行中",
+    "threadWaiting": "Agent 等待确认",
     "confirmArchive": "确认归档",
     "archive": "归档",
     "confirmArchiveAria": "确认归档 {{title}}",

@@ -1,7 +1,7 @@
 import { useEffect, useState, type RefObject } from 'react'
 import { IconInline } from '../icon-inline'
 import { useI18n } from '../i18n/i18n'
-import type { AppViewId, ChatState, SettingsCategoryId, WorkspaceProject, WorkspaceThread } from './types'
+import type { AppViewId, ChatState, SettingsCategoryId, ThreadRunState, WorkspaceProject, WorkspaceThread } from './types'
 import { AppFilePanel } from './AppFilePanel'
 import { ChatPage, type ChatPageHandle } from './ChatPage'
 import { DocsPage } from './DocsPage'
@@ -15,6 +15,7 @@ type AppShellWorkspaceProps = {
   activeProject: WorkspaceProject
   activeThread: WorkspaceThread
   projects: WorkspaceProject[]
+  threadRunStates: Record<string, ThreadRunState>
   chatRef: RefObject<ChatPageHandle | null>
   onStatusChange: (text: string) => void
   onNewThread: (projectId?: string) => string | void
@@ -22,6 +23,7 @@ type AppShellWorkspaceProps = {
   onCreateProject: (mode: 'scratch' | 'existing') => void | Promise<void>
   onThreadChatStateChange: (threadId: string, update: ChatState | ((prev: ChatState) => ChatState)) => void
   onThreadPromptSubmit: (threadId: string, prompt: string) => void
+  onThreadRunStateChange: (threadId: string, state: ThreadRunState | null) => void
   showProjectSkillsInSidebar: boolean
   onShowProjectSkillsInSidebarChange: (enabled: boolean) => void
 }
@@ -34,6 +36,7 @@ export function AppShellWorkspace({
   activeProject,
   activeThread,
   projects,
+  threadRunStates,
   chatRef,
   onStatusChange,
   onNewThread,
@@ -41,6 +44,7 @@ export function AppShellWorkspace({
   onCreateProject,
   onThreadChatStateChange,
   onThreadPromptSubmit,
+  onThreadRunStateChange,
   showProjectSkillsInSidebar,
   onShowProjectSkillsInSidebarChange,
 }: AppShellWorkspaceProps) {
@@ -90,12 +94,14 @@ export function AppShellWorkspace({
             activeProject={activeProject}
             activeThread={activeThread}
             projects={projects}
+            threadRunStates={threadRunStates}
             onStatusChange={onStatusChange}
             onNewThread={onNewThread}
             onSelectProject={onSelectProject}
             onCreateProject={onCreateProject}
             onThreadChatStateChange={onThreadChatStateChange}
             onThreadPromptSubmit={onThreadPromptSubmit}
+            onThreadRunStateChange={onThreadRunStateChange}
           />
           <DocsPage hidden={activeViewId !== 'docs'} />
           <SettingsPage

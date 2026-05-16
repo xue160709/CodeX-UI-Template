@@ -11,7 +11,14 @@ import {
 import { IconInline } from '../icon-inline'
 import type { AppLocale } from '../i18n/i18n'
 import { useI18n } from '../i18n/i18n'
-import type { AppViewId, ProjectSkillListState, SettingsCategoryId, WorkspaceProject, WorkspaceThread } from './types'
+import type {
+  AppViewId,
+  ProjectSkillListState,
+  SettingsCategoryId,
+  ThreadRunState,
+  WorkspaceProject,
+  WorkspaceThread,
+} from './types'
 import { SETTINGS_SIDEBAR_NAV } from './app-shell-constants.ts'
 
 type ContextMenuItem = {
@@ -33,6 +40,7 @@ type AppShellSidebarProps = {
   settingsCategory: SettingsCategoryId
   projects: WorkspaceProject[]
   threads: WorkspaceThread[]
+  threadRunStates: Record<string, ThreadRunState>
   activeProjectId: string
   activeThreadId: string
   showProjectSkills: boolean
@@ -62,6 +70,7 @@ export function AppShellSidebar({
   settingsCategory,
   projects,
   threads,
+  threadRunStates,
   activeProjectId,
   activeThreadId,
   showProjectSkills,
@@ -484,11 +493,13 @@ export function AppShellSidebar({
                             const isThreadActive = activeThreadId === thread.id
                             const isConfirming = confirmingArchiveThreadId === thread.id
                             const isPinned = Boolean(thread.pinnedAt)
+                            const runState = threadRunStates[thread.id]
+                            const isThreadRunning = Boolean(runState)
                             const timeLabel = formatThreadTime(thread.updatedAt, locale, t)
                             return (
                               <div
                                 key={thread.id}
-                                className={`app-thread-row${isThreadActive ? ' is-active' : ''}${isPinned ? ' is-pinned' : ''}${isConfirming ? ' is-confirming-archive' : ''}`}
+                                className={`app-thread-row${isThreadActive ? ' is-active' : ''}${isPinned ? ' is-pinned' : ''}${isThreadRunning ? ' is-running' : ''}${isConfirming ? ' is-confirming-archive' : ''}`}
                                 onContextMenu={(event) => openThreadMenu(event, thread)}
                               >
                                 <button
@@ -521,9 +532,25 @@ export function AppShellSidebar({
                                   <span className="app-thread-title">{thread.title}</span>
                                 </button>
                                 <div className="app-thread-trailing">
-                                  <span className="app-thread-time" aria-label={t('sidebar.lastChatAria', { time: timeLabel })}>
-                                    {timeLabel}
-                                  </span>
+                                  {runState ? (
+                                    <span
+                                      className={`app-thread-running${runState.status === 'waiting' ? ' is-waiting' : ''}`}
+                                      title={
+                                        runState.status === 'waiting'
+                                          ? t('sidebar.threadWaiting')
+                                          : t('sidebar.threadRunning')
+                                      }
+                                      aria-label={
+                                        runState.status === 'waiting'
+                                          ? t('sidebar.threadWaiting')
+                                          : t('sidebar.threadRunning')
+                                      }
+                                    />
+                                  ) : (
+                                    <span className="app-thread-time" aria-label={t('sidebar.lastChatAria', { time: timeLabel })}>
+                                      {timeLabel}
+                                    </span>
+                                  )}
                                   <button
                                     type="button"
                                     className={`app-thread-archive${isConfirming ? ' is-confirming' : ''}`}

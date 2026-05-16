@@ -71,7 +71,8 @@ type StreamBlockState = {
 }
 
 export class ClaudeAgentRunner {
-  private activeRequest?: ActiveRequest
+  private readonly activeRequests = new Map<string, ActiveRequest>()
+  private readonly activeRequestIdsByThread = new Map<string, string>()
   private readonly defaultThreadId = 'default'
   private readonly threadRuntimeStates = new Map<string, ThreadRuntimeState>()
   private readonly pendingPermissionRequests = new Map<string, PendingPermissionRequest>()
@@ -98,11 +99,11 @@ export class ClaudeAgentRunner {
       return { requestId }
     }
 
-    if (this.activeRequest) {
-      this.cancel(this.activeRequest.requestId)
-    }
-
     const cwd = resolveWorkspaceCwd(payload.cwd, this.cwd)
+    const previousRequestId = this.activeRequestIdsByThread.get(threadId)
+    if (previousRequestId) {
+      void this.cancel(previousRequestId)
+    }
 
     const activeRequest: ActiveRequest = {
       requestId,
@@ -118,17 +119,28 @@ export class ClaudeAgentRunner {
       streamBlocks: new Map(),
     }
 
-    this.activeRequest = activeRequest
+    this.activeRequests.set(requestId, activeRequest)
+    this.activeRequestIdsByThread.set(threadId, requestId)
     void this.run(text, attachments, activeRequest)
 
     return { requestId }
   }
 
   async cancel(requestId?: string): Promise<void> {
-    const activeRequest = this.activeRequest
-    if (!activeRequest) return
-    if (requestId && requestId !== activeRequest.requestId) return
+    if (requestId) {
+      const activeRequest = this.activeRequests.get(requestId)
+      if (!activeRequest) return
+      this.cancelRequest(activeRequest)
+      return
+    }
 
+    for (const activeRequest of this.activeRequests.values()) {
+      this.cancelRequest(activeRequest)
+    }
+  }
+
+  private cancelRequest(activeRequest: ActiveRequest): void {
+    if (activeRequest.cancelled) return
     activeRequest.cancelled = true
     activeRequest.abortController.abort()
     activeRequest.query?.close()
@@ -142,8 +154,11 @@ export class ClaudeAgentRunner {
 
   async newThread(threadId?: string): Promise<void> {
     const normalizedThreadId = this.normalizeThreadId(threadId)
-    if (!threadId || this.activeRequest?.threadId === normalizedThreadId) {
+    if (!threadId) {
       await this.cancel()
+    } else {
+      const activeRequestId = this.activeRequestIdsByThread.get(normalizedThreadId)
+      if (activeRequestId) await this.cancel(activeRequestId)
     }
     this.threadRuntimeStates.delete(normalizedThreadId)
   }
@@ -305,8 +320,9 @@ export class ClaudeAgentRunner {
 
   private finish(activeRequest: ActiveRequest): void {
     this.denyPendingRequests(activeRequest.requestId, 'Request finished.')
-    if (this.activeRequest?.requestId === activeRequest.requestId) {
-      this.activeRequest = undefined
+    this.activeRequests.delete(activeRequest.requestId)
+    if (this.activeRequestIdsByThread.get(activeRequest.threadId) === activeRequest.requestId) {
+      this.activeRequestIdsByThread.delete(activeRequest.threadId)
     }
   }
 
@@ -885,7 +901,8 @@ export class ClaudeAgentRunner {
 
   private emit(event: ClaudeChatEvent): void {
     if (this.webContents.isDestroyed()) return
-    this.webContents.send(CLAUDE_CHAT_EVENT_CHANNEL, event)
+    const threadId = event.threadId ?? this.activeRequests.get(event.requestId)?.threadId
+    this.webContents.send(CLAUDE_CHAT_EVENT_CHANNEL, threadId ? { ...event, threadId } : event)
   }
 
   private normalizeThreadId(threadId?: string): string {

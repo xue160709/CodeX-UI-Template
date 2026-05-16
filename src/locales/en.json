@@ -46,6 +46,8 @@
     "unpinThreadAria": "Unpin {{title}}",
     "pinThreadAria": "Pin {{title}}",
     "lastChatAria": "Last active {{time}}",
+    "threadRunning": "Agent running",
+    "threadWaiting": "Agent waiting for input",
     "confirmArchive": "Confirm archive",
     "archive": "Archive",
     "confirmArchiveAria": "Confirm archive {{title}}",

@@ -69,7 +69,7 @@ export class ClaudeAgentSettingsStore {
     const env = this.getEnvSnapshot()
 
     if (settings.configSource === 'env') {
-      const resolved = {
+      const resolved: ClaudeAgentResolvedConfig = {
         configSource: 'env',
         apiKey: readEnv('ANTHROPIC_API_KEY'),
         authToken: readEnv('ANTHROPIC_AUTH_TOKEN'),
@@ -94,7 +94,7 @@ export class ClaudeAgentSettingsStore {
       overlay && provider && providerAcceptsModel(provider, overlay) ? overlay : ''
     const resolvedModel = effectiveOverlay || primaryModel || env.model
 
-    const resolved = {
+    const resolved: ClaudeAgentResolvedConfig = {
       configSource: 'settings',
       apiKey: providerApiKey || envApiKey,
       authToken: providerApiKey || envApiKey ? '' : readEnv('ANTHROPIC_AUTH_TOKEN'),

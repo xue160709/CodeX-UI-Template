@@ -9,6 +9,7 @@ export type MessageStatus = 'done' | 'streaming' | 'error' | 'cancelled'
 export type ToolStatus = 'running' | 'done' | 'error' | 'denied'
 export type ThinkingStatus = 'running' | 'done'
 export type ActivityStatus = 'running' | 'done' | 'error' | 'info'
+export type ThreadRunStatus = 'running' | 'waiting'
 
 export type ChatMessageItem = {
   type: 'message'
@@ -86,6 +87,12 @@ export type WorkspaceThread = {
   pinnedAt?: number
   archivedAt?: number
   chatState: ChatState
+}
+
+export type ThreadRunState = {
+  requestId: string
+  status: ThreadRunStatus
+  updatedAt: number
 }
 
 export type FileTreeNode = {

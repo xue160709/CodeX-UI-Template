@@ -23,6 +23,7 @@ import type {
   ChatWorkspaceState,
   ProjectSkillListState,
   SettingsCategoryId,
+  ThreadRunState,
   WorkspaceProject,
   WorkspaceThread,
 } from './types'
@@ -43,6 +44,7 @@ export function AppShell() {
     readStoredBoolean(SIDEBAR_PROJECT_SKILLS_STORAGE_KEY, false),
   )
   const [projectSkillStates, setProjectSkillStates] = useState<Record<string, ProjectSkillListState>>({})
+  const [threadRunStates, setThreadRunStates] = useState<Record<string, ThreadRunState>>({})
   const [hiddenSkillPathsByProject, setHiddenSkillPathsByProject] = useState<Record<string, string[]>>(() =>
     readHiddenSkillPathsMap(),
   )
@@ -64,6 +66,26 @@ export function AppShell() {
     writeStoredBoolean(SIDEBAR_PROJECT_SKILLS_STORAGE_KEY, enabled)
   }, [])
 
+  const updateThreadRunState = useCallback((threadId: string, state: ThreadRunState | null) => {
+    setThreadRunStates((prev) => {
+      const current = prev[threadId]
+      if (!state) {
+        if (!current) return prev
+        const next = { ...prev }
+        delete next[threadId]
+        return next
+      }
+      if (
+        current?.requestId === state.requestId &&
+        current.status === state.status &&
+        current.updatedAt === state.updatedAt
+      ) {
+        return prev
+      }
+      return { ...prev, [threadId]: state }
+    })
+  }, [])
+
   const activeProject =
     chatWorkspace?.projects.find((project) => project.id === chatWorkspace.activeProjectId) ??
     chatWorkspace?.projects[0]
@@ -81,6 +103,11 @@ export function AppShell() {
   const projectIdsKey = useMemo(
     () => chatWorkspace?.projects.map((project) => project.id).sort().join('\n') ?? '',
     [chatWorkspace?.projects],
+  )
+
+  const threadIdsKey = useMemo(
+    () => chatWorkspace?.threads.map((thread) => thread.id).sort().join('\n') ?? '',
+    [chatWorkspace?.threads],
   )
 
   useEffect(() => {
@@ -127,7 +154,21 @@ export function AppShell() {
       }
       return changed ? next : current
     })
-  }, [projectSkillProjectKey])
+
+    setThreadRunStates((current) => {
+      const threadIds = new Set(chatWorkspace.threads.map((thread) => thread.id))
+      let changed = false
+      const next: Record<string, ThreadRunState> = {}
+      for (const [threadId, state] of Object.entries(current)) {
+        if (!threadIds.has(threadId)) {
+          changed = true
+          continue
+        }
+        next[threadId] = state
+      }
+      return changed ? next : current
+    })
+  }, [projectSkillProjectKey, threadIdsKey, chatWorkspace])
 
   useEffect(() => {
     projectSkillStatesRef.current = projectSkillStates
@@ -699,6 +740,7 @@ export function AppShell() {
           settingsCategory={settingsCategory}
           projects={chatWorkspace.projects}
           threads={chatWorkspace.threads}
+          threadRunStates={threadRunStates}
           activeProjectId={chatWorkspace.activeProjectId}
           activeThreadId={chatWorkspace.activeThreadId}
           showProjectSkills={showProjectSkillsInSidebar}
@@ -730,6 +772,7 @@ export function AppShell() {
           activeProject={activeProject}
           activeThread={activeThread}
           projects={chatWorkspace.projects}
+          threadRunStates={threadRunStates}
           chatRef={chatRef}
           onStatusChange={setHeaderStatus}
           onNewThread={createThreadInProject}
@@ -737,6 +780,7 @@ export function AppShell() {
           onCreateProject={createProject}
           onThreadChatStateChange={updateThreadChatState}
           onThreadPromptSubmit={handleThreadPromptSubmit}
+          onThreadRunStateChange={updateThreadRunState}
           showProjectSkillsInSidebar={showProjectSkillsInSidebar}
           onShowProjectSkillsInSidebarChange={updateShowProjectSkillsInSidebar}
         />

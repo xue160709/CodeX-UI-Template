@@ -213,7 +213,12 @@ export type ClaudeChatSubmitResult = {
 
 export type ClaudeChatActivityStatus = 'running' | 'done' | 'error' | 'info'
 
-export type ClaudeChatEvent =
+export type ClaudeChatEvent = ClaudeChatEventBase & {
+  /** 事件所属的聊天线程；旧事件可能缺省，渲染层会回退到本地 request 映射 */
+  threadId?: string
+}
+
+export type ClaudeChatEventBase =
   | {
       type: 'session_start'
       requestId: string
