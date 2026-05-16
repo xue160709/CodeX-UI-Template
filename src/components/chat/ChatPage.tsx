@@ -22,7 +22,6 @@ import type {
   ClaudePermissionMode,
   ProjectFileSearchItem,
 } from '../../claude-chat-types'
-import { IconInline } from '../../icon-inline'
 import { useI18n } from '../../i18n/i18n'
 import type {
   ChatActivityItem,
@@ -31,15 +30,17 @@ import type {
   ChatState,
   ChatThinkingItem,
   ChatToolItem,
+  SelectedProjectSkill,
   ThreadRunState,
   TranscriptItem,
   WorkspaceProject,
   WorkspaceThread,
 } from '../types'
 import { AgentInputPromptModal, type PendingUserInputPrompt, type UserInputDecision } from './AgentInputPromptModal'
+import { ChatConversation } from './ChatConversation'
 import { Composer } from './Composer'
 import type { BuiltInSlashCommand, ChatModelMenuRow, ComposerSuggestion, ComposerTrigger, PermissionModeRow } from './local-types'
-import { Transcript } from './Transcript'
+import { ProjectHome } from './ProjectHome'
 
 const SETTINGS_CHANGED_EVENT = 'claude-agent-settings:changed'
 const MAX_COMPOSER_SUGGESTIONS = 64
@@ -54,13 +55,13 @@ export type ChatPageHandle = {
 type ChatPageProps = {
   hidden: boolean
   activeProject: WorkspaceProject
-  activeThread: WorkspaceThread
+  activeThread: WorkspaceThread | undefined
+  selectedProjectSkill: SelectedProjectSkill | null
   projects: WorkspaceProject[]
   threadRunStates: Record<string, ThreadRunState>
   onStatusChange: (text: string) => void
   onNewThread: (projectId?: string) => string | void
-  onSelectProject: (projectId: string) => void
-  onCreateProject: (mode: 'scratch' | 'existing') => void | Promise<void>
+  onRunProjectSkill: (projectId: string, prompt: string) => void
   onThreadChatStateChange: (threadId: string, update: ChatState | ((prev: ChatState) => ChatState)) => void
   onThreadPromptSubmit: (threadId: string, prompt: string) => void
   onThreadRunStateChange: (threadId: string, state: ThreadRunState | null) => void
@@ -104,12 +105,12 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     hidden,
     activeProject,
     activeThread,
+    selectedProjectSkill,
     projects,
     threadRunStates,
     onStatusChange,
     onNewThread,
-    onSelectProject,
-    onCreateProject,
+    onRunProjectSkill,
     onThreadChatStateChange,
     onThreadPromptSubmit,
     onThreadRunStateChange,
@@ -117,20 +118,18 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
   ref,
 ) {
   const { t } = useI18n()
-  const chatState = activeThread.chatState
-  const activeRunState = threadRunStates[activeThread.id]
+  const chatItems = activeThread?.chatState.items ?? []
+  const activeRunState = activeThread ? threadRunStates[activeThread.id] : undefined
   const isRunning = Boolean(activeRunState)
   const [inputValue, setInputValue] = useState('')
   const [isComposingText, setIsComposingText] = useState(false)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [modelPickerOpen, setModelPickerOpen] = useState(false)
-  const [projectPickerOpen, setProjectPickerOpen] = useState(false)
   const [modelMenuRows, setModelMenuRows] = useState<ChatModelMenuRow[]>([])
   const [modelMenuSelectionKey, setModelMenuSelectionKey] = useState('')
   const [activeModelSupportsImages, setActiveModelSupportsImages] = useState(false)
   const [pendingAttachments, setPendingAttachments] = useState<ClaudeChatAttachment[]>([])
   const [agentContext, setAgentContext] = useState<AgentContextCatalog | null>(null)
-  const [agentContextLoading, setAgentContextLoading] = useState(false)
   const [permissionMode, setPermissionMode] = useState<ClaudePermissionMode>(() => readStoredPermissionMode())
   const [permissionModeOpen, setPermissionModeOpen] = useState(false)
   const [pendingUserInputPrompts, setPendingUserInputPrompts] = useState<PendingUserInputPrompt[]>([])
@@ -145,15 +144,12 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const modelPickerRef = useRef<HTMLDivElement>(null)
   const permissionModePickerRef = useRef<HTMLDivElement>(null)
-  const projectPickerRef = useRef<HTMLDivElement>(null)
   const composerAutocompleteSurfaceRef = useRef<HTMLDivElement>(null)
-  const projectPopoverAnchorRef = useRef<HTMLButtonElement>(null)
-  const projectPopoverSurfaceRef = useRef<HTMLDivElement>(null)
   const modelPopoverAnchorRef = useRef<HTMLButtonElement>(null)
   const modelPopoverSurfaceRef = useRef<HTMLDivElement>(null)
   const permissionModePopoverAnchorRef = useRef<HTMLButtonElement>(null)
   const permissionModePopoverSurfaceRef = useRef<HTMLDivElement>(null)
-  const activeThreadIdRef = useRef(activeThread.id)
+  const activeThreadIdRef = useRef(activeThread?.id ?? '')
   const threadRunStatesRef = useRef<Record<string, ThreadRunState>>(threadRunStates)
   const requestThreadIdsRef = useRef(new Map<string, string>())
   const requestAssistantMessageIdsRef = useRef(new Map<string, string>())
@@ -172,12 +168,6 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     width: number
     maxHeight: number
   } | null>(null)
-  const [projectPopoverBox, setProjectPopoverBox] = useState<{
-    left: number
-    bottom: number
-    width: number
-    maxHeight: number
-  } | null>(null)
   const scrollIntentRef = useRef<'none' | 'force-bottom'>('none')
   const isFirstTranscriptLayoutRef = useRef(true)
   const isRunningRef = useRef(false)
@@ -190,7 +180,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     maxHeight: number
   } | null>(null)
 
-  const hasMessages = chatState.items.length > 0
+  const hasMessages = chatItems.length > 0
   const activeUserInputPrompt = pendingUserInputPrompts[0] ?? null
   const permissionModeRows = useMemo(() => getPermissionModeRows(t), [t])
   const permissionModeLabel = permissionModeRows.find((row) => row.mode === permissionMode)?.label ?? t('chat.permissionModeAuto')
@@ -208,14 +198,11 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       return
     }
 
-    setAgentContextLoading(true)
     try {
       const result = await listAgentContext(activeProject.path)
       setAgentContext(result.ok ? result : null)
     } catch {
       setAgentContext(null)
-    } finally {
-      setAgentContextLoading(false)
     }
   }, [activeProject.path])
 
@@ -269,18 +256,17 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
   )
 
   useEffect(() => {
-    activeThreadIdRef.current = activeThread.id
+    activeThreadIdRef.current = activeThread?.id ?? ''
     isFirstTranscriptLayoutRef.current = true
     scrollIntentRef.current = 'force-bottom'
     setShowScrollButton(false)
     setModelPickerOpen(false)
-    setProjectPickerOpen(false)
     setPendingAttachments([])
 
     window.claudeChat?.getSettings().then(applyGlobalModelFromSettings).catch(() => {
       /* Browser preview can run without the Electron bridge. */
     })
-  }, [activeThread.id, applyGlobalModelFromSettings])
+  }, [activeThread?.id, activeProject.id, applyGlobalModelFromSettings])
 
   useEffect(() => {
     window.claudeChat?.getSettings().then(applyGlobalModelFromSettings).catch(() => {
@@ -465,38 +451,6 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     }
   }, [permissionModeOpen, permissionModeRows.length])
 
-  useLayoutEffect(() => {
-    if (!projectPickerOpen || !projectPopoverAnchorRef.current) {
-      setProjectPopoverBox(null)
-      return
-    }
-    const gap = 6
-    const pad = 8
-    const maxListPx = 360
-
-    const sync = () => {
-      const anchor = projectPopoverAnchorRef.current
-      if (!anchor) return
-      const r = anchor.getBoundingClientRect()
-      const spaceAbove = r.top - pad
-      const maxH = Math.min(maxListPx, Math.max(120, spaceAbove))
-      const width = Math.min(320, window.innerWidth - pad * 2)
-      let left = r.left
-      if (left + width > window.innerWidth - pad) left = window.innerWidth - pad - width
-      if (left < pad) left = pad
-      const bottom = window.innerHeight - r.top + gap
-      setProjectPopoverBox({ left, bottom, width, maxHeight: maxH })
-    }
-
-    sync()
-    window.addEventListener('resize', sync)
-    document.addEventListener('scroll', sync, true)
-    return () => {
-      window.removeEventListener('resize', sync)
-      document.removeEventListener('scroll', sync, true)
-    }
-  }, [projectPickerOpen, projects.length])
-
   useEffect(() => {
     if (!modelPickerOpen) return
     const onPointerDown = (event: MouseEvent) => {
@@ -537,26 +491,6 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     }
   }, [permissionModeOpen])
 
-  useEffect(() => {
-    if (!projectPickerOpen) return
-    const onPointerDown = (event: MouseEvent) => {
-      const t = event.target as Node | null
-      if (!t) return
-      if (projectPickerRef.current?.contains(t)) return
-      if (projectPopoverSurfaceRef.current?.contains(t)) return
-      setProjectPickerOpen(false)
-    }
-    const onKeyDown = (event: WindowEventMap['keydown']) => {
-      if (event.key === 'Escape') setProjectPickerOpen(false)
-    }
-    document.addEventListener('mousedown', onPointerDown)
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown)
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [projectPickerOpen])
-
   const syncScrollButtonVisibility = useCallback(() => {
     const sr = scrollRegionRef.current
     if (!sr || sr.hidden) {
@@ -585,18 +519,18 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     } else {
       syncScrollButtonVisibility()
     }
-  }, [chatState, hasMessages, syncScrollButtonVisibility])
+  }, [activeThread?.chatState, hasMessages, syncScrollButtonVisibility])
 
   useEffect(() => {
     const sr = scrollRegionRef.current
     if (!sr) return
     const onScroll = () => {
-      if (!chatState.items.length) return
+      if (!chatItems.length) return
       syncScrollButtonVisibility()
     }
     sr.addEventListener('scroll', onScroll, { passive: true })
     return () => sr.removeEventListener('scroll', onScroll)
-  }, [chatState.items.length, syncScrollButtonVisibility])
+  }, [chatItems.length, syncScrollButtonVisibility])
 
   useEffect(() => {
     const sr = scrollRegionRef.current
@@ -1018,14 +952,23 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     attachmentsForSubmit: ClaudeChatAttachment[] = [],
   ) => {
     const text = rawText.trim()
-    const submittingThreadId = target?.threadId ?? activeThreadIdRef.current
-    if ((!text && attachmentsForSubmit.length === 0) || threadRunStatesRef.current[submittingThreadId]) return
+    if (!text && attachmentsForSubmit.length === 0) return
     if (attachmentsForSubmit.some((attachment) => attachment.kind === 'image') && !activeModelSupportsImages) {
       onStatusChange(t('chat.imageInputDisabledStatus'))
       return
     }
     const projectForSubmit =
-      target?.project ?? projects.find((project) => project.id === activeThread.projectId) ?? activeProject
+      target?.project ?? (activeThread ? projects.find((project) => project.id === activeThread.projectId) : undefined) ?? activeProject
+    let submittingThreadId = target?.threadId ?? activeThreadIdRef.current
+    if (!submittingThreadId) {
+      const createdThreadId = onNewThread(projectForSubmit.id)
+      if (!createdThreadId) return
+      submittingThreadId = createdThreadId
+      activeThreadIdRef.current = createdThreadId
+      isFirstTranscriptLayoutRef.current = true
+      scrollIntentRef.current = 'force-bottom'
+    }
+    if (threadRunStatesRef.current[submittingThreadId]) return
 
     const userMessage: ChatMessageItem = {
       type: 'message',
@@ -1112,7 +1055,8 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     ref,
     () => ({
       startNewThread: async () => {
-        onNewThread()
+        const threadId = onNewThread()
+        if (threadId) activeThreadIdRef.current = threadId
         scrollIntentRef.current = 'force-bottom'
         isFirstTranscriptLayoutRef.current = true
         onStatusChange(compactModelName(globalDisplayModelRef.current, t))
@@ -1258,6 +1202,11 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     if (!isRunningRef.current) void submitPrompt(inputValue, undefined, pendingAttachments)
   }
 
+  const runSelectedSkill = () => {
+    if (!selectedProjectSkill) return
+    onRunProjectSkill(selectedProjectSkill.projectId, selectedProjectSkill.title)
+  }
+
   return (
     <section
       className={`chat-page${hasMessages ? ' has-messages' : ''}`}
@@ -1266,31 +1215,17 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       hidden={hidden}
       aria-hidden={hidden}
     >
-      <div className="chat-empty-header" id="chat-empty-header" hidden={hasMessages}>
-        <h1>{t('chat.emptyHeading')}</h1>
-      </div>
-      <div className="chat-scroll-region" id="chat-scroll-region" ref={scrollRegionRef} hidden={!hasMessages}>
-        <div className="chat-transcript" id="chat-transcript" aria-live="polite">
-          <Transcript items={chatState.items} />
-        </div>
-      </div>
-      <button
-        type="button"
-        className="btn btn-scroll-bottom"
-        id="btn-scroll-bottom"
-        title={t('chat.scrollBottomTitle')}
-        aria-label={t('chat.scrollBottomAria')}
-        hidden={!hasMessages}
-        aria-hidden={!showScrollButton}
-        tabIndex={showScrollButton ? 0 : -1}
-        data-visible={showScrollButton || undefined}
-        onClick={() => scrollToBottom('smooth')}
-      >
-        <IconInline name="arrowDown" />
-      </button>
+      {hasMessages ? (
+        <ChatConversation
+          items={chatItems}
+          scrollRegionRef={scrollRegionRef}
+          showScrollButton={showScrollButton}
+          onScrollToBottom={scrollToBottom}
+        />
+      ) : (
+        <ProjectHome project={activeProject} selectedSkill={selectedProjectSkill} onRunSelectedSkill={runSelectedSkill} />
+      )}
       <Composer
-        activeProject={activeProject}
-        projects={projects}
         inputValue={inputValue}
         isRunning={isRunning}
         activeModelSupportsImages={activeModelSupportsImages}
@@ -1305,15 +1240,11 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         modelMenuSelectionKey={modelMenuSelectionKey}
         modelPopoverBox={modelPopoverBox}
         displayModelName={compactModelName(globalDisplayModel, t)}
-        projectPickerOpen={projectPickerOpen}
-        projectPopoverBox={projectPopoverBox}
         composerAutocompleteOpen={composerAutocompleteOpen}
         composerAutocompleteBox={composerAutocompleteBox}
         activeComposerTrigger={activeComposerTrigger}
         composerSuggestions={composerSuggestions}
         composerSuggestionIndex={composerSuggestionIndex}
-        agentContext={agentContext}
-        agentContextLoading={agentContextLoading}
         chatInputRef={chatInputRef}
         composerAutocompleteSurfaceRef={composerAutocompleteSurfaceRef}
         permissionModePickerRef={permissionModePickerRef}
@@ -1322,13 +1253,9 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         modelPickerRef={modelPickerRef}
         modelPopoverAnchorRef={modelPopoverAnchorRef}
         modelPopoverSurfaceRef={modelPopoverSurfaceRef}
-        projectPickerRef={projectPickerRef}
-        projectPopoverAnchorRef={projectPopoverAnchorRef}
-        projectPopoverSurfaceRef={projectPopoverSurfaceRef}
         setPermissionMode={setPermissionMode}
         setPermissionModeOpen={setPermissionModeOpen}
         setModelPickerOpen={setModelPickerOpen}
-        setProjectPickerOpen={setProjectPickerOpen}
         setComposerSuggestionIndex={setComposerSuggestionIndex}
         onInputChange={(value, selectionStart, selectionEnd) => {
           setInputValue(value)
@@ -1345,9 +1272,6 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         onRemoveComposerAttachment={removeComposerAttachment}
         onInsertComposerSuggestion={insertComposerSuggestion}
         onPickChatMenuRow={(row) => void pickChatMenuRow(row)}
-        onSelectProject={onSelectProject}
-        onCreateProject={onCreateProject}
-        onRefreshAgentContext={() => void refreshAgentContext()}
       />
       {activeUserInputPrompt
         ? createPortal(

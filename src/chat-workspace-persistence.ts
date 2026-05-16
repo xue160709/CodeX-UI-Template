@@ -72,8 +72,9 @@ function loadChatWorkspaceFromLocalStorage(): ChatWorkspaceState | null {
 export function createDefaultChatWorkspaceState(): ChatWorkspaceState {
   const now = Date.now()
   const activeProjectId = 'project-codex-ui-template'
-  const activeThreadId = 'thread-welcome'
   const legacyChatState = loadLegacyChatState()
+  const hasLegacyConversation = legacyChatState.items.length > 0
+  const activeThreadId = hasLegacyConversation ? 'thread-welcome' : ''
   return {
     activeProjectId,
     activeThreadId,
@@ -86,16 +87,18 @@ export function createDefaultChatWorkspaceState(): ChatWorkspaceState {
         updatedAt: now,
       },
     ],
-    threads: [
-      {
-        id: activeThreadId,
-        projectId: activeProjectId,
-        title: legacyChatState.items.length > 0 ? '最近对话' : '新对话',
-        createdAt: now,
-        updatedAt: now,
-        chatState: legacyChatState,
-      },
-    ],
+    threads: hasLegacyConversation
+      ? [
+          {
+            id: activeThreadId,
+            projectId: activeProjectId,
+            title: '最近对话',
+            createdAt: now,
+            updatedAt: now,
+            chatState: legacyChatState,
+          },
+        ]
+      : [],
   }
 }
 
@@ -137,35 +140,25 @@ export function normalizeChatWorkspaceState(value: unknown): ChatWorkspaceState 
     ]
   })
 
-  if (threads.filter((thread) => !thread.archivedAt).length === 0) {
-    const now = Date.now()
-    threads.unshift({
-      id: createId('thread'),
-      projectId: projects[0].id,
-      title: '新对话',
-      createdAt: now,
-      updatedAt: now,
-      chatState: createEmptyChatState(),
-    })
-  }
-
   const activeProjectId =
     typeof value.activeProjectId === 'string' && projectIds.has(value.activeProjectId)
       ? value.activeProjectId
       : projects[0].id
   const visibleThreads = threads.filter((thread) => !thread.archivedAt)
+  const requestedProjectHome = value.activeThreadId === ''
   const activeThread =
-    typeof value.activeThreadId === 'string'
+    typeof value.activeThreadId === 'string' && !requestedProjectHome
       ? visibleThreads.find((thread) => thread.id === value.activeThreadId)
       : undefined
-  const fallbackThread =
-    activeThread ??
-    latestVisibleThreadForProject({ activeProjectId, activeThreadId: '', projects, threads }, activeProjectId) ??
-    visibleThreads[0]
+  const activeProjectThread = requestedProjectHome
+    ? undefined
+    : activeThread?.projectId === activeProjectId
+      ? activeThread
+      : latestVisibleThreadForProject({ activeProjectId, activeThreadId: '', projects, threads }, activeProjectId)
 
   return {
-    activeProjectId: fallbackThread?.projectId ?? activeProjectId,
-    activeThreadId: fallbackThread?.id ?? '',
+    activeProjectId,
+    activeThreadId: activeProjectThread?.id ?? '',
     projects,
     threads,
   }

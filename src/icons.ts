@@ -15,6 +15,8 @@ export const Icons = {
     '<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>',
   send:
     '<svg class="icon-composer-action" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75V6.75M6.375 12.375 12 6.75 17.625 12.375"/></svg>',
+  play:
+    '<svg class="icon-xs" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.75c0-.9.98-1.46 1.75-1l9 5.75c.7.45.7 1.5 0 1.95l-9 5.8c-.77.5-1.75-.06-1.75-1V5.75z"/></svg>',
   stop:
     '<svg class="icon-composer-action" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5.5" y="5.5" width="13" height="13" rx="2.25"/></svg>',
   mic:

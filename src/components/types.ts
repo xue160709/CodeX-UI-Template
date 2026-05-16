@@ -131,3 +131,10 @@ export type ProjectSkillListState = {
   skills: AgentContextSlashItem[]
   message?: string
 }
+
+export type SelectedProjectSkill = Pick<
+  AgentContextSlashItem,
+  'title' | 'description' | 'path' | 'relativePath' | 'argumentHint'
+> & {
+  projectId: string
+}

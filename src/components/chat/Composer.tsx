@@ -8,13 +8,11 @@ import type {
   SetStateAction,
 } from 'react'
 import type {
-  AgentContextCatalog,
   ClaudeChatAttachment,
   ClaudePermissionMode,
 } from '../../claude-chat-types'
 import { IconInline } from '../../icon-inline'
 import { useI18n } from '../../i18n/i18n'
-import type { WorkspaceProject } from '../types'
 import { AttachmentThumb } from './AttachmentThumb'
 import { formatBytes } from './format'
 import type { ChatModelMenuRow, ComposerSuggestion, ComposerTrigger, PermissionModeRow } from './local-types'
@@ -27,8 +25,6 @@ type PopoverBox = {
 }
 
 type ComposerProps = {
-  activeProject: WorkspaceProject
-  projects: WorkspaceProject[]
   inputValue: string
   isRunning: boolean
   activeModelSupportsImages: boolean
@@ -43,15 +39,11 @@ type ComposerProps = {
   modelMenuSelectionKey: string
   modelPopoverBox: PopoverBox | null
   displayModelName: string
-  projectPickerOpen: boolean
-  projectPopoverBox: PopoverBox | null
   composerAutocompleteOpen: boolean
   composerAutocompleteBox: PopoverBox | null
   activeComposerTrigger: ComposerTrigger | null
   composerSuggestions: ComposerSuggestion[]
   composerSuggestionIndex: number
-  agentContext: AgentContextCatalog | null
-  agentContextLoading: boolean
   chatInputRef: RefObject<HTMLTextAreaElement | null>
   composerAutocompleteSurfaceRef: RefObject<HTMLDivElement | null>
   permissionModePickerRef: RefObject<HTMLDivElement | null>
@@ -60,13 +52,9 @@ type ComposerProps = {
   modelPickerRef: RefObject<HTMLDivElement | null>
   modelPopoverAnchorRef: RefObject<HTMLButtonElement | null>
   modelPopoverSurfaceRef: RefObject<HTMLDivElement | null>
-  projectPickerRef: RefObject<HTMLDivElement | null>
-  projectPopoverAnchorRef: RefObject<HTMLButtonElement | null>
-  projectPopoverSurfaceRef: RefObject<HTMLDivElement | null>
   setPermissionMode: Dispatch<SetStateAction<ClaudePermissionMode>>
   setPermissionModeOpen: Dispatch<SetStateAction<boolean>>
   setModelPickerOpen: Dispatch<SetStateAction<boolean>>
-  setProjectPickerOpen: Dispatch<SetStateAction<boolean>>
   setComposerSuggestionIndex: Dispatch<SetStateAction<number>>
   onInputChange: (value: string, selectionStart: number, selectionEnd: number) => void
   onCompositionStart: () => void
@@ -79,14 +67,9 @@ type ComposerProps = {
   onRemoveComposerAttachment: (attachmentId: string) => void
   onInsertComposerSuggestion: (suggestion: ComposerSuggestion) => void
   onPickChatMenuRow: (row: ChatModelMenuRow) => void
-  onSelectProject: (projectId: string) => void
-  onCreateProject: (mode: 'scratch' | 'existing') => void | Promise<void>
-  onRefreshAgentContext: () => void
 }
 
 export function Composer({
-  activeProject,
-  projects,
   inputValue,
   isRunning,
   activeModelSupportsImages,
@@ -101,15 +84,11 @@ export function Composer({
   modelMenuSelectionKey,
   modelPopoverBox,
   displayModelName,
-  projectPickerOpen,
-  projectPopoverBox,
   composerAutocompleteOpen,
   composerAutocompleteBox,
   activeComposerTrigger,
   composerSuggestions,
   composerSuggestionIndex,
-  agentContext,
-  agentContextLoading,
   chatInputRef,
   composerAutocompleteSurfaceRef,
   permissionModePickerRef,
@@ -118,13 +97,9 @@ export function Composer({
   modelPickerRef,
   modelPopoverAnchorRef,
   modelPopoverSurfaceRef,
-  projectPickerRef,
-  projectPopoverAnchorRef,
-  projectPopoverSurfaceRef,
   setPermissionMode,
   setPermissionModeOpen,
   setModelPickerOpen,
-  setProjectPickerOpen,
   setComposerSuggestionIndex,
   onInputChange,
   onCompositionStart,
@@ -137,9 +112,6 @@ export function Composer({
   onRemoveComposerAttachment,
   onInsertComposerSuggestion,
   onPickChatMenuRow,
-  onSelectProject,
-  onCreateProject,
-  onRefreshAgentContext,
 }: ComposerProps) {
   const { t } = useI18n()
   const hasSendText = inputValue.trim().length > 0
@@ -369,101 +341,6 @@ export function Composer({
           </div>
         </div>
       </form>
-
-      <div className="chat-context-strip" aria-label={t('chat.contextStripAria')}>
-        <div className="chat-project-picker" ref={projectPickerRef}>
-          <button
-            ref={projectPopoverAnchorRef}
-            type="button"
-            className={`chat-project-trigger${projectPickerOpen ? ' is-open' : ''}`}
-            aria-haspopup="menu"
-            aria-expanded={projectPickerOpen}
-            title={t('chat.switchProject')}
-            onClick={() => setProjectPickerOpen((open) => !open)}
-          >
-            <IconInline name="folder" />
-            <span>{activeProject.name}</span>
-            <IconInline name="chevron" />
-          </button>
-          {projectPickerOpen && projectPopoverBox
-            ? createPortal(
-                <div
-                  ref={projectPopoverSurfaceRef}
-                  className="chat-project-popover"
-                  role="menu"
-                  aria-label={t('chat.projectMenuAria')}
-                  style={{
-                    position: 'fixed',
-                    left: projectPopoverBox.left,
-                    bottom: projectPopoverBox.bottom,
-                    width: projectPopoverBox.width,
-                    maxHeight: projectPopoverBox.maxHeight,
-                  }}
-                >
-                  <div className="chat-project-popover-title">{t('chat.projectMenuTitle')}</div>
-                  <div className="chat-project-options">
-                    {projects.map((project) => {
-                      const selected = project.id === activeProject.id
-                      return (
-                        <button
-                          key={project.id}
-                          type="button"
-                          role="menuitemradio"
-                          aria-checked={selected}
-                          className={`chat-project-option${selected ? ' is-selected' : ''}`}
-                          onClick={() => {
-                            onSelectProject(project.id)
-                            setProjectPickerOpen(false)
-                          }}
-                        >
-                          <IconInline name="folder" />
-                          <span className="chat-project-option-copy">
-                            <span>{project.name}</span>
-                            <span>{project.path}</span>
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <div className="chat-project-popover-title">{t('chat.addProjectTitle')}</div>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="chat-project-option"
-                    onClick={() => {
-                      setProjectPickerOpen(false)
-                      void onCreateProject('existing')
-                    }}
-                  >
-                    <IconInline name="folder" />
-                    <span className="chat-project-option-copy">
-                      <span>{t('chat.useExistingFolder')}</span>
-                      <span>{t('chat.useExistingFolderSub')}</span>
-                    </span>
-                  </button>
-                </div>,
-                document.body,
-              )
-            : null}
-        </div>
-        <button
-          type="button"
-          className="chat-context-action"
-          title={t('chat.refreshContextTitle')}
-          disabled={agentContextLoading}
-          onClick={onRefreshAgentContext}
-        >
-          <IconInline name="chip" />
-          <span>
-            {agentContextLoading
-              ? t('chat.scanning')
-              : t('chat.skillsAgentsCount', {
-                  skills: agentContext?.skills.length ?? 0,
-                  agents: agentContext?.agents.length ?? 0,
-                })}
-          </span>
-        </button>
-      </div>
     </div>
   )
 }

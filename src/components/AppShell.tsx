@@ -22,6 +22,7 @@ import type {
   ChatState,
   ChatWorkspaceState,
   ProjectSkillListState,
+  SelectedProjectSkill,
   SettingsCategoryId,
   ThreadRunState,
   WorkspaceProject,
@@ -43,10 +44,11 @@ export function AppShell() {
   const [headerStatus, setHeaderStatus] = useState(() => translate(getInitialLocale(), 'shell.headerDefault'))
   const [chatWorkspace, setChatWorkspace] = useState<ChatWorkspaceState | null>(null)
   const [showProjectSkillsInSidebar, setShowProjectSkillsInSidebar] = useState(() =>
-    readStoredBoolean(SIDEBAR_PROJECT_SKILLS_STORAGE_KEY, false),
+    readStoredBoolean(SIDEBAR_PROJECT_SKILLS_STORAGE_KEY, true),
   )
   const [projectSkillStates, setProjectSkillStates] = useState<Record<string, ProjectSkillListState>>({})
   const [threadRunStates, setThreadRunStates] = useState<Record<string, ThreadRunState>>({})
+  const [selectedProjectSkill, setSelectedProjectSkill] = useState<SelectedProjectSkill | null>(null)
   const [hiddenSkillPathsByProject, setHiddenSkillPathsByProject] = useState<Record<string, string[]>>(() =>
     readHiddenSkillPathsMap(),
   )
@@ -94,12 +96,20 @@ export function AppShell() {
   const activeProject =
     chatWorkspace?.projects.find((project) => project.id === chatWorkspace.activeProjectId) ??
     chatWorkspace?.projects[0]
+  const explicitActiveThread =
+    chatWorkspace && activeProject
+      ? chatWorkspace.threads.find(
+          (thread) =>
+            thread.id === chatWorkspace.activeThreadId &&
+            thread.projectId === activeProject.id &&
+            !thread.archivedAt,
+        )
+      : undefined
   const activeThread =
-    (chatWorkspace &&
-      (chatWorkspace.threads.find((thread) => thread.id === chatWorkspace.activeThreadId) ??
-        latestVisibleThreadForProject(chatWorkspace, activeProject?.id ?? '') ??
-        chatWorkspace.threads[0])) ||
-    undefined
+    explicitActiveThread ??
+    (chatWorkspace?.activeThreadId && activeProject
+      ? latestVisibleThreadForProject(chatWorkspace, activeProject.id)
+      : undefined)
   const projectSkillProjectKey = useMemo(
     () => chatWorkspace?.projects.map((project) => `${project.id}:${project.path}`).join('\n') ?? '',
     [chatWorkspace?.projects],
@@ -318,6 +328,7 @@ export function AppShell() {
 
   const selectThread = useCallback(
     (threadId: string) => {
+      setSelectedProjectSkill(null)
       updateChatWorkspace((prev) => {
         const thread = prev.threads.find((item) => item.id === threadId && !item.archivedAt)
         if (!thread) return prev
@@ -334,6 +345,7 @@ export function AppShell() {
 
   const createThreadInProject = useCallback(
     (projectId?: string) => {
+      setSelectedProjectSkill(null)
       const threadId = createId('thread')
       const now = Date.now()
       updateChatWorkspace((prev) => {
@@ -363,6 +375,7 @@ export function AppShell() {
   )
 
   const runProjectSkill = useCallback((projectId: string, prompt: string) => {
+    setSelectedProjectSkill(null)
     const submit = chatRef.current?.submitPromptInNewThread(projectId, prompt)
     if (!submit) {
       createThreadInProject(projectId)
@@ -375,41 +388,18 @@ export function AppShell() {
 
   const selectProject = useCallback(
     (projectId: string) => {
-      const fallbackThreadId = createId('thread')
-      let createdThreadId: string | null = null
+      setSelectedProjectSkill(null)
       updateChatWorkspace((prev) => {
         if (!prev.projects.some((project) => project.id === projectId)) return prev
-        const existingThread = latestVisibleThreadForProject(prev, projectId)
-        if (existingThread) {
-          return {
-            ...prev,
-            activeProjectId: projectId,
-            activeThreadId: existingThread.id,
-          }
-        }
-        const now = Date.now()
-        createdThreadId = fallbackThreadId
         return {
           ...prev,
           activeProjectId: projectId,
-          activeThreadId: fallbackThreadId,
-          threads: [
-            {
-              id: fallbackThreadId,
-              projectId,
-              title: t('thread.newThreadTitle'),
-              createdAt: now,
-              updatedAt: now,
-              chatState: createEmptyChatState(),
-            },
-            ...prev.threads,
-          ],
+          activeThreadId: '',
         }
       })
-      if (createdThreadId) void window.claudeChat?.newThread(createdThreadId)
       goHome()
     },
-    [goHome, updateChatWorkspace, t],
+    [goHome, updateChatWorkspace],
   )
 
   const createProject = useCallback(
@@ -426,7 +416,6 @@ export function AppShell() {
 
       const now = Date.now()
       const projectId = createId('project')
-      const threadId = createId('thread')
       const scratchDefault = t('project.scratchDefaultName')
       const name = mode === 'existing' ? pathBasename(value, scratchDefault) : value
       const project: WorkspaceProject = {
@@ -436,23 +425,15 @@ export function AppShell() {
         createdAt: now,
         updatedAt: now,
       }
-      const thread: WorkspaceThread = {
-        id: threadId,
-        projectId,
-        title: t('thread.newThreadTitle'),
-        createdAt: now,
-        updatedAt: now,
-        chatState: createEmptyChatState(),
-      }
 
+      setSelectedProjectSkill(null)
       updateChatWorkspace((prev) => ({
         ...prev,
         activeProjectId: projectId,
-        activeThreadId: threadId,
+        activeThreadId: '',
         projects: [project, ...prev.projects],
-        threads: [thread, ...prev.threads],
+        threads: prev.threads,
       }))
-      void window.claudeChat?.newThread(threadId)
       goHome()
       requestAnimationFrame(() => void chatRef.current?.focusComposer())
     },
@@ -478,7 +459,6 @@ export function AppShell() {
 
   const archiveThread = useCallback(
     (threadId: string) => {
-      let createdThreadId: string | null = null
       updateChatWorkspace((prev) => {
         const target = prev.threads.find((thread) => thread.id === threadId)
         if (!target || target.archivedAt) return prev
@@ -492,11 +472,7 @@ export function AppShell() {
         }
 
         const nextState: ChatWorkspaceState = { ...prev, threads: nextThreads }
-        const nextActive =
-          latestVisibleThreadForProject(nextState, target.projectId) ??
-          nextThreads
-            .filter((thread) => !thread.archivedAt)
-            .sort((a, b) => b.updatedAt - a.updatedAt)[0]
+        const nextActive = latestVisibleThreadForProject(nextState, target.projectId)
 
         if (nextActive) {
           return {
@@ -506,29 +482,16 @@ export function AppShell() {
           }
         }
 
-        const newThreadId = createId('thread')
-        createdThreadId = newThreadId
         return {
           ...nextState,
           activeProjectId: target.projectId,
-          activeThreadId: newThreadId,
-          threads: [
-            {
-              id: newThreadId,
-              projectId: target.projectId,
-              title: t('thread.newThreadTitle'),
-              createdAt: now,
-              updatedAt: now,
-              chatState: createEmptyChatState(),
-            },
-            ...nextThreads,
-          ],
+          activeThreadId: '',
         }
       })
-      if (createdThreadId) void window.claudeChat?.newThread(createdThreadId)
+      setSelectedProjectSkill(null)
       goHome()
     },
-    [goHome, updateChatWorkspace, t],
+    [goHome, updateChatWorkspace],
   )
 
   const toggleThreadPinned = useCallback((threadId: string) => {
@@ -553,7 +516,6 @@ export function AppShell() {
 
   const removeProject = useCallback(
     (projectId: string) => {
-      let createdThreadId: string | null = null
       let didRemove = false
       updateChatWorkspace((prev) => {
         if (prev.projects.length <= 1) return prev
@@ -568,29 +530,7 @@ export function AppShell() {
 
         if (prev.activeProjectId === projectId) {
           activeProjectId = nextProjects[0]?.id ?? prev.activeProjectId
-          const candidate = latestVisibleThreadForProject(
-            { ...prev, projects: nextProjects, threads: nextThreads, activeProjectId, activeThreadId: '' },
-            activeProjectId,
-          )
-          if (candidate) {
-            activeThreadId = candidate.id
-          } else if (activeProjectId) {
-            const newThreadId = createId('thread')
-            const now = Date.now()
-            createdThreadId = newThreadId
-            activeThreadId = newThreadId
-            nextThreads = [
-              {
-                id: newThreadId,
-                projectId: activeProjectId,
-                title: t('thread.newThreadTitle'),
-                createdAt: now,
-                updatedAt: now,
-                chatState: createEmptyChatState(),
-              },
-              ...nextThreads,
-            ]
-          }
+          activeThreadId = ''
         }
 
         return {
@@ -602,10 +542,10 @@ export function AppShell() {
         }
       })
       if (!didRemove) return
-      if (createdThreadId) void window.claudeChat?.newThread(createdThreadId)
+      setSelectedProjectSkill((current) => (current?.projectId === projectId ? null : current))
       goHome()
     },
-    [goHome, t, updateChatWorkspace],
+    [goHome, updateChatWorkspace],
   )
 
   const revealProjectInFileManager = useCallback((projectPath: string) => {
@@ -620,9 +560,29 @@ export function AppShell() {
       writeHiddenSkillPathsMap(next)
       return next
     })
+    setSelectedProjectSkill((current) =>
+      current?.projectId === projectId && current.path === skillPath ? null : current,
+    )
   }, [])
 
+  const selectProjectSkill = useCallback(
+    (projectId: string, skill: Omit<SelectedProjectSkill, 'projectId'>) => {
+      setSelectedProjectSkill({ ...skill, projectId })
+      updateChatWorkspace((prev) => {
+        if (!prev.projects.some((project) => project.id === projectId)) return prev
+        return {
+          ...prev,
+          activeProjectId: projectId,
+          activeThreadId: '',
+        }
+      })
+      goHome()
+    },
+    [goHome, updateChatWorkspace],
+  )
+
   const handleThreadPromptSubmit = useCallback((threadId: string, prompt: string) => {
+    setSelectedProjectSkill(null)
     updateChatWorkspace((prev) => ({
       ...prev,
       threads: prev.threads.map((thread) => {
@@ -759,7 +719,7 @@ export function AppShell() {
     return t(VIEW_HEADING_KEYS[activeViewId])
   }, [activeViewId, settingsCategory, t])
 
-  if (!chatWorkspace || !activeProject || !activeThread) {
+  if (!chatWorkspace || !activeProject) {
     return null
   }
 
@@ -780,13 +740,14 @@ export function AppShell() {
           activeThreadId={chatWorkspace.activeThreadId}
           showProjectSkills={showProjectSkillsInSidebar}
           projectSkillStates={projectSkillStates}
+          selectedProjectSkill={selectedProjectSkill}
           hiddenSkillPathsByProject={hiddenSkillPathsByProject}
           canBack={canBack}
           canForward={canForward}
-          onNewThread={() => createThreadInProject()}
+          onCreateProject={createProject}
           onSelectProject={selectProject}
           onSelectThread={selectThread}
-          onCreateThreadInProject={createThreadInProject}
+          onSelectProjectSkill={selectProjectSkill}
           onRunProjectSkill={runProjectSkill}
           onToggleThreadPinned={toggleThreadPinned}
           onArchiveThread={archiveThread}
@@ -806,13 +767,13 @@ export function AppShell() {
           settingsCategory={settingsCategory}
           activeProject={activeProject}
           activeThread={activeThread}
+          selectedProjectSkill={selectedProjectSkill}
           projects={chatWorkspace.projects}
           threadRunStates={threadRunStates}
           chatRef={chatRef}
           onStatusChange={setHeaderStatus}
           onNewThread={createThreadInProject}
-          onSelectProject={selectProject}
-          onCreateProject={createProject}
+          onRunProjectSkill={runProjectSkill}
           onThreadChatStateChange={updateThreadChatState}
           onThreadPromptSubmit={handleThreadPromptSubmit}
           onThreadRunStateChange={updateThreadRunState}

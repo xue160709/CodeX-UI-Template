@@ -14,6 +14,7 @@ import { useI18n } from '../i18n/i18n'
 import type {
   AppViewId,
   ProjectSkillListState,
+  SelectedProjectSkill,
   SettingsCategoryId,
   ThreadRunState,
   WorkspaceProject,
@@ -45,13 +46,14 @@ type AppShellSidebarProps = {
   activeThreadId: string
   showProjectSkills: boolean
   projectSkillStates: Record<string, ProjectSkillListState>
+  selectedProjectSkill: SelectedProjectSkill | null
   hiddenSkillPathsByProject: Record<string, string[]>
   canBack: boolean
   canForward: boolean
-  onNewThread: () => void
+  onCreateProject: (mode: 'scratch' | 'existing') => void | Promise<void>
   onSelectProject: (projectId: string) => void
   onSelectThread: (threadId: string) => void
-  onCreateThreadInProject: (projectId: string) => void
+  onSelectProjectSkill: (projectId: string, skill: Omit<SelectedProjectSkill, 'projectId'>) => void
   onRunProjectSkill: (projectId: string, prompt: string) => void
   onToggleThreadPinned: (threadId: string) => void
   onArchiveThread: (threadId: string) => void
@@ -75,13 +77,14 @@ export function AppShellSidebar({
   activeThreadId,
   showProjectSkills,
   projectSkillStates,
+  selectedProjectSkill,
   hiddenSkillPathsByProject,
   canBack,
   canForward,
-  onNewThread,
+  onCreateProject,
   onSelectProject,
   onSelectThread,
-  onCreateThreadInProject,
+  onSelectProjectSkill,
   onRunProjectSkill,
   onToggleThreadPinned,
   onArchiveThread,
@@ -98,6 +101,7 @@ export function AppShellSidebar({
   const isSettingsSidebar = activeViewId === 'settings'
   const [confirmingArchiveThreadId, setConfirmingArchiveThreadId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [collapsedProjectIds, setCollapsedProjectIds] = useState<Set<string>>(() => new Set())
   const [skillTip, setSkillTip] = useState<{
     text: string
     skillPath: string
@@ -114,7 +118,35 @@ export function AppShellSidebar({
     })
   }, [projects])
 
+  useEffect(() => {
+    const projectIds = new Set(projects.map((project) => project.id))
+    setCollapsedProjectIds((current) => {
+      let changed = false
+      const next = new Set<string>()
+      for (const projectId of current) {
+        if (projectIds.has(projectId)) {
+          next.add(projectId)
+        } else {
+          changed = true
+        }
+      }
+      return changed ? next : current
+    })
+  }, [projects])
+
   const closeContextMenu = () => setContextMenu(null)
+
+  const toggleProjectExpanded = (projectId: string) => {
+    setCollapsedProjectIds((current) => {
+      const next = new Set(current)
+      if (next.has(projectId)) {
+        next.delete(projectId)
+      } else {
+        next.add(projectId)
+      }
+      return next
+    })
+  }
 
   useEffect(() => {
     if (contextMenu) setSkillTip(null)
@@ -388,21 +420,27 @@ export function AppShellSidebar({
               </>
             ) : (
               <>
-                <button type="button" className="app-sidebar-new-thread" id="btn-sidebar-new-thread" onClick={onNewThread}>
+                <button
+                  type="button"
+                  className="app-sidebar-new-thread"
+                  id="btn-sidebar-new-project"
+                  onClick={() => void onCreateProject('existing')}
+                >
                   <IconInline name="plus" />
-                  <span>{t('sidebar.newThread')}</span>
+                  <span>{t('sidebar.addProject')}</span>
                 </button>
                 <div className="app-sidebar-section-label">{t('sidebar.projectsSection')}</div>
                 <div className="app-project-list">
                   {sortedProjects.map((project) => {
                     const projectThreads = threadsByProject.get(project.id) ?? []
                     const projectActive = activeProjectId === project.id
+                    const projectExpanded = !collapsedProjectIds.has(project.id)
                     const projectSkillState = projectSkillStates[project.id]
                     const projectSkills = projectSkillState?.skills ?? []
                     const hiddenPaths = new Set(hiddenSkillPathsByProject[project.id] ?? [])
                     const visibleSkills = projectSkills.filter((skill) => !hiddenPaths.has(skill.path))
                     const showSkillsSection = Boolean(projectSkillState?.loading) || visibleSkills.length > 0
-                    const showThreadHistoryDivider = projectThreads.length > 0 && showProjectSkills
+                    const showThreadHistoryDivider = showProjectSkills
                     return (
                       <section key={project.id} className={`app-project-group${projectActive ? ' is-active' : ''}${project.pinnedAt ? ' is-pinned' : ''}`}>
                         <div
@@ -425,153 +463,175 @@ export function AppShellSidebar({
                           </button>
                           <button
                             type="button"
-                            className="app-project-new-thread"
-                            title={t('sidebar.newThreadInProject')}
-                            aria-label={t('sidebar.newThreadInProjectAria', { name: project.name })}
+                            className={`app-project-toggle${projectExpanded ? ' is-expanded' : ' is-collapsed'}`}
+                            title={projectExpanded ? t('sidebar.collapseProject') : t('sidebar.expandProject')}
+                            aria-label={
+                              projectExpanded
+                                ? t('sidebar.collapseProjectAria', { name: project.name })
+                                : t('sidebar.expandProjectAria', { name: project.name })
+                            }
+                            aria-expanded={projectExpanded}
                             onClick={(event) => {
                               event.stopPropagation()
                               setConfirmingArchiveThreadId(null)
-                              onCreateThreadInProject(project.id)
+                              toggleProjectExpanded(project.id)
                             }}
                           >
-                            <IconInline name="plus" />
+                            <IconInline name="chevron" />
                           </button>
                         </div>
-                        {showProjectSkills && showSkillsSection ? (
-                          <div className="app-project-skill-block" aria-label={`${project.name} Skills`}>
-                            <div className="app-sidebar-divider">
-                              <span>{t('sidebar.skillsDivider')}</span>
-                            </div>
-                            <div className="app-skill-list">
-                              {projectSkillState?.loading ? (
-                                <div className="app-skill-empty">{t('sidebar.scanning')}</div>
-                              ) : (
-                                visibleSkills.map((skill) => {
-                                  const tipText = skill.description.trim()
-                                  const tipActive = Boolean(tipText) && skillTip?.skillPath === skill.path
-                                  return (
-                                    <button
-                                      key={skill.path}
-                                      type="button"
-                                      className="app-skill-row"
-                                      title={tipText ? undefined : skill.relativePath}
-                                      aria-describedby={tipActive ? 'app-sidebar-skill-tip' : undefined}
-                                      onPointerEnter={(event) => {
-                                        if (!tipText) return
-                                        const r = event.currentTarget.getBoundingClientRect()
-                                        setSkillTip({
-                                          text: tipText,
-                                          skillPath: skill.path,
-                                          anchor: { left: r.left, top: r.top, width: r.width, height: r.height },
-                                        })
-                                      }}
-                                      onPointerLeave={() => {
-                                        setSkillTip((prev) => (prev?.skillPath === skill.path ? null : prev))
-                                      }}
-                                      onContextMenu={(event) => openSkillMenu(event, project.id, skill)}
-                                      onClick={() => {
-                                        setConfirmingArchiveThreadId(null)
-                                        onRunProjectSkill(project.id, skill.title)
-                                      }}
-                                    >
-                                      <IconInline name="chip" />
-                                      <span className="app-skill-title">{skill.title}</span>
-                                    </button>
-                                  )
-                                })
-                              )}
-                            </div>
-                          </div>
-                        ) : null}
-                        {showProjectSkills && showThreadHistoryDivider ? (
-                          <div className="app-sidebar-divider app-sidebar-divider--threads">
-                            <span>{t('sidebar.threadHistory')}</span>
-                          </div>
-                        ) : null}
-                        <div className="app-thread-list" aria-label={t('sidebar.threadsForProjectAria', { name: project.name })}>
-                          {projectThreads.map((thread) => {
-                            const isThreadActive = activeThreadId === thread.id
-                            const isConfirming = confirmingArchiveThreadId === thread.id
-                            const isPinned = Boolean(thread.pinnedAt)
-                            const runState = threadRunStates[thread.id]
-                            const isThreadRunning = Boolean(runState)
-                            const timeLabel = formatThreadTime(thread.updatedAt, locale, t)
-                            return (
-                              <div
-                                key={thread.id}
-                                className={`app-thread-row${isThreadActive ? ' is-active' : ''}${isPinned ? ' is-pinned' : ''}${isThreadRunning ? ' is-running' : ''}${isConfirming ? ' is-confirming-archive' : ''}`}
-                                onContextMenu={(event) => openThreadMenu(event, thread)}
-                              >
-                                <button
-                                  type="button"
-                                  className={`app-thread-pin${isPinned ? ' is-pinned' : ''}`}
-                                  title={isPinned ? t('sidebar.unpin') : t('sidebar.pin')}
-                                  aria-label={
-                                    isPinned
-                                      ? t('sidebar.unpinThreadAria', { title: thread.title })
-                                      : t('sidebar.pinThreadAria', { title: thread.title })
-                                  }
-                                  aria-pressed={isPinned}
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    setConfirmingArchiveThreadId(null)
-                                    onToggleThreadPinned(thread.id)
-                                  }}
-                                >
-                                  <IconInline name="pin" />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="app-thread-select"
-                                  aria-current={isThreadActive ? 'page' : undefined}
-                                  onClick={() => {
-                                    setConfirmingArchiveThreadId(null)
-                                    onSelectThread(thread.id)
-                                  }}
-                                >
-                                  <span className="app-thread-title">{thread.title}</span>
-                                </button>
-                                <div className="app-thread-trailing">
-                                  {runState ? (
-                                    <span
-                                      className={`app-thread-running${runState.status === 'waiting' ? ' is-waiting' : ''}`}
-                                      title={
-                                        runState.status === 'waiting'
-                                          ? t('sidebar.threadWaiting')
-                                          : t('sidebar.threadRunning')
-                                      }
-                                      aria-label={
-                                        runState.status === 'waiting'
-                                          ? t('sidebar.threadWaiting')
-                                          : t('sidebar.threadRunning')
-                                      }
-                                    />
+                        {projectExpanded ? (
+                          <div className="app-project-content">
+                            {showProjectSkills && showSkillsSection ? (
+                              <div className="app-project-skill-block" aria-label={`${project.name} Skills`}>
+                                <div className="app-sidebar-divider">
+                                  <span>{t('sidebar.skillsDivider')}</span>
+                                </div>
+                                <div className="app-skill-list">
+                                  {projectSkillState?.loading ? (
+                                    <div className="app-skill-empty">{t('sidebar.scanning')}</div>
                                   ) : (
-                                    <span className="app-thread-time" aria-label={t('sidebar.lastChatAria', { time: timeLabel })}>
-                                      {timeLabel}
-                                    </span>
+                                    visibleSkills.map((skill) => {
+                                      const tipText = skill.description.trim()
+                                      const tipActive = Boolean(tipText) && skillTip?.skillPath === skill.path
+                                      const skillActive =
+                                        selectedProjectSkill?.projectId === project.id &&
+                                        selectedProjectSkill.path === skill.path
+                                      return (
+                                        <button
+                                          key={skill.path}
+                                          type="button"
+                                          className={`app-skill-row${skillActive ? ' is-active' : ''}`}
+                                          title={tipText ? undefined : skill.relativePath}
+                                          aria-current={skillActive ? 'page' : undefined}
+                                          aria-describedby={tipActive ? 'app-sidebar-skill-tip' : undefined}
+                                          onPointerEnter={(event) => {
+                                            if (!tipText) return
+                                            const r = event.currentTarget.getBoundingClientRect()
+                                            setSkillTip({
+                                              text: tipText,
+                                              skillPath: skill.path,
+                                              anchor: { left: r.left, top: r.top, width: r.width, height: r.height },
+                                            })
+                                          }}
+                                          onPointerLeave={() => {
+                                            setSkillTip((prev) => (prev?.skillPath === skill.path ? null : prev))
+                                          }}
+                                          onContextMenu={(event) => openSkillMenu(event, project.id, skill)}
+                                          onClick={() => {
+                                            setConfirmingArchiveThreadId(null)
+                                            onSelectProjectSkill(project.id, {
+                                              title: skill.title,
+                                              description: skill.description,
+                                              path: skill.path,
+                                              relativePath: skill.relativePath,
+                                              argumentHint: skill.argumentHint,
+                                            })
+                                          }}
+                                        >
+                                          <IconInline name="chip" />
+                                          <span className="app-skill-title">{skill.title}</span>
+                                        </button>
+                                      )
+                                    })
                                   )}
-                                  <button
-                                    type="button"
-                                    className={`app-thread-archive${isConfirming ? ' is-confirming' : ''}`}
-                                    title={isConfirming ? t('sidebar.confirmArchive') : t('sidebar.archive')}
-                                    aria-label={
-                                      isConfirming
-                                        ? t('sidebar.confirmArchiveAria', { title: thread.title })
-                                        : t('sidebar.archiveAria', { title: thread.title })
-                                    }
-                                    onClick={(event) => {
-                                      event.stopPropagation()
-                                      requestArchive(thread.id)
-                                    }}
-                                  >
-                                    {isConfirming ? <span>{t('sidebar.confirm')}</span> : <IconInline name="trash" />}
-                                  </button>
                                 </div>
                               </div>
-                            )
-                          })}
-                        </div>
+                            ) : null}
+                            {showThreadHistoryDivider ? (
+                              <div className="app-sidebar-divider app-sidebar-divider--threads">
+                                <span>{t('sidebar.threadHistory')}</span>
+                              </div>
+                            ) : null}
+                            <div className="app-thread-list" aria-label={t('sidebar.threadsForProjectAria', { name: project.name })}>
+                              {projectThreads.length === 0 ? (
+                                <div className="app-thread-empty">{t('sidebar.noThreadHistory')}</div>
+                              ) : null}
+                              {projectThreads.map((thread) => {
+                                const isThreadActive = activeThreadId === thread.id
+                                const isConfirming = confirmingArchiveThreadId === thread.id
+                                const isPinned = Boolean(thread.pinnedAt)
+                                const runState = threadRunStates[thread.id]
+                                const isThreadRunning = Boolean(runState)
+                                const timeLabel = formatThreadTime(thread.updatedAt, locale, t)
+                                return (
+                                  <div
+                                    key={thread.id}
+                                    className={`app-thread-row${isThreadActive ? ' is-active' : ''}${isPinned ? ' is-pinned' : ''}${isThreadRunning ? ' is-running' : ''}${isConfirming ? ' is-confirming-archive' : ''}`}
+                                    onContextMenu={(event) => openThreadMenu(event, thread)}
+                                  >
+                                    <button
+                                      type="button"
+                                      className={`app-thread-pin${isPinned ? ' is-pinned' : ''}`}
+                                      title={isPinned ? t('sidebar.unpin') : t('sidebar.pin')}
+                                      aria-label={
+                                        isPinned
+                                          ? t('sidebar.unpinThreadAria', { title: thread.title })
+                                          : t('sidebar.pinThreadAria', { title: thread.title })
+                                      }
+                                      aria-pressed={isPinned}
+                                      onClick={(event) => {
+                                        event.stopPropagation()
+                                        setConfirmingArchiveThreadId(null)
+                                        onToggleThreadPinned(thread.id)
+                                      }}
+                                    >
+                                      <IconInline name="pin" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="app-thread-select"
+                                      aria-current={isThreadActive ? 'page' : undefined}
+                                      onClick={() => {
+                                        setConfirmingArchiveThreadId(null)
+                                        onSelectThread(thread.id)
+                                      }}
+                                    >
+                                      <span className="app-thread-title">{thread.title}</span>
+                                    </button>
+                                    <div className="app-thread-trailing">
+                                      {runState ? (
+                                        <span
+                                          className={`app-thread-running${runState.status === 'waiting' ? ' is-waiting' : ''}`}
+                                          title={
+                                            runState.status === 'waiting'
+                                              ? t('sidebar.threadWaiting')
+                                              : t('sidebar.threadRunning')
+                                          }
+                                          aria-label={
+                                            runState.status === 'waiting'
+                                              ? t('sidebar.threadWaiting')
+                                              : t('sidebar.threadRunning')
+                                          }
+                                        />
+                                      ) : (
+                                        <span className="app-thread-time" aria-label={t('sidebar.lastChatAria', { time: timeLabel })}>
+                                          {timeLabel}
+                                        </span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        className={`app-thread-archive${isConfirming ? ' is-confirming' : ''}`}
+                                        title={isConfirming ? t('sidebar.confirmArchive') : t('sidebar.archive')}
+                                        aria-label={
+                                          isConfirming
+                                            ? t('sidebar.confirmArchiveAria', { title: thread.title })
+                                            : t('sidebar.archiveAria', { title: thread.title })
+                                        }
+                                        onClick={(event) => {
+                                          event.stopPropagation()
+                                          requestArchive(thread.id)
+                                        }}
+                                      >
+                                        {isConfirming ? <span>{t('sidebar.confirm')}</span> : <IconInline name="trash" />}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
                       </section>
                     )
                   })}
