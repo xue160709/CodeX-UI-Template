@@ -6,6 +6,7 @@ import path from 'node:path'
 import zh from '../src/locales/zh.json'
 import en from '../src/locales/en.json'
 import type { DesktopPreferences } from '../src/desktop-types'
+import { ensureAgentModeFiles, getAgentModeStatus } from './agent-mode-files'
 import { discoverAgentContext, searchProjectFiles } from './agent-context'
 import { ClaudeAgentRunner } from './claude-agent-runner'
 import { ClaudeAgentSettingsStore } from './claude-agent-settings'
@@ -413,6 +414,12 @@ if (gotSingleInstanceLock) {
     })
     ipcMain.handle('desktop:list-agent-context', (_event, rootPath: string) => {
       return discoverAgentContext(rootPath)
+    })
+    ipcMain.handle('desktop:get-agent-mode-status', (_event, rootPath: string) => {
+      return getAgentModeStatus(rootPath)
+    })
+    ipcMain.handle('desktop:ensure-agent-mode-files', (_event, rootPath: string) => {
+      return ensureAgentModeFiles(rootPath)
     })
     ipcMain.handle('desktop:quit', () => {
       app.quit()

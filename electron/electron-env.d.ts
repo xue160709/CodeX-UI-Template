@@ -6,7 +6,12 @@ import type {
   ClaudeChatAttachmentPickerResult,
   ProjectFileSearchResult,
 } from '../src/claude-chat-types'
-import type { DesktopPreferences, TrayMenuAction } from '../src/desktop-types'
+import type {
+  AgentModeFilesResult,
+  AgentModeStatusResult,
+  DesktopPreferences,
+  TrayMenuAction,
+} from '../src/desktop-types'
 import type { ChatWorkspaceState, FileTreeResult } from '../src/components/types'
 
 declare global {
@@ -46,6 +51,8 @@ declare global {
       listProjectFiles?: (rootPath: string) => Promise<FileTreeResult>
       searchProjectFiles?: (rootPath: string, query: string) => Promise<ProjectFileSearchResult>
       listAgentContext?: (rootPath: string) => Promise<AgentContextResult>
+      getAgentModeStatus?: (rootPath: string) => Promise<AgentModeStatusResult>
+      ensureAgentModeFiles?: (rootPath: string) => Promise<AgentModeFilesResult>
       getChatWorkspace?: () => Promise<ChatWorkspaceState | null>
       saveChatWorkspace?: (state: ChatWorkspaceState) => Promise<ChatWorkspaceState>
       quitApp?: () => Promise<void>

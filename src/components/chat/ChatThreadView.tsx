@@ -1,22 +1,24 @@
-import type { RefObject } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import { IconInline } from '../../icon-inline'
 import { useI18n } from '../../i18n/i18n'
 import type { TranscriptItem } from '../types'
 import { Transcript } from './Transcript'
 
-type ChatConversationProps = {
+type ChatThreadViewProps = {
   items: TranscriptItem[]
+  composer: ReactNode
   scrollRegionRef: RefObject<HTMLDivElement | null>
   showScrollButton: boolean
   onScrollToBottom: (behavior: ScrollBehavior) => void
 }
 
-export function ChatConversation({
+export function ChatThreadView({
   items,
+  composer,
   scrollRegionRef,
   showScrollButton,
   onScrollToBottom,
-}: ChatConversationProps) {
+}: ChatThreadViewProps) {
   const { t } = useI18n()
 
   return (
@@ -39,6 +41,7 @@ export function ChatConversation({
       >
         <IconInline name="arrowDown" />
       </button>
+      {composer}
     </>
   )
 }

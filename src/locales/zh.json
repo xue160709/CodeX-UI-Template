@@ -79,7 +79,20 @@
   },
   "workspace": {
     "fileTree": "文件树",
-    "toggleFilePanel": "切换文件树面板"
+    "toggleFilePanel": "切换文件树面板",
+    "agentModeTitle": "Agent 模式",
+    "agentModeToggle": "开启 Agent 模式",
+    "agentModeToggleDesc": "创建并注入 AGENTS/MEMORY/SOUL/USER/IDENTITY 上下文。",
+    "agentModeReady": "当前项目已启用 Agent 模式。",
+    "agentModeNeedsSetup": "开启后会在当前项目准备 OpenClaw 风格的身份和记忆文件。",
+    "agentModeUnavailable": "当前运行环境不支持 Agent 模式初始化。",
+    "agentModeEnabling": "正在准备 Agent 模式文件...",
+    "agentModeFailed": "开启 Agent 模式失败",
+    "agentModeFileStatus": {
+      "created": "已创建",
+      "updated": "已更新",
+      "exists": "已存在"
+    }
   },
   "thread": {
     "newThreadTitle": "新对话"
@@ -213,6 +226,16 @@
   "chat": {
     "ariaPage": "Claude Agent 聊天",
     "emptyHeading": "我们该构建什么？",
+    "startCardsAria": "开始建议",
+    "startCardPlanTitle": "梳理 MVP 计划",
+    "startCardPlanDesc": "用当前项目做一轮需求、范围和开发计划整理。",
+    "startCardPlanPrompt": "请先阅读当前项目，帮我梳理一个 MVP 开发计划。",
+    "startCardRefactorTitle": "检查可重构点",
+    "startCardRefactorDesc": "先定位结构和重复逻辑，再给出可执行改造。",
+    "startCardRefactorPrompt": "请检查当前项目的前端结构，找出最值得重构的组件边界。",
+    "startCardAgentTitle": "准备 Agent 记忆",
+    "startCardAgentDesc": "检查 Agent 文件、记忆目录和 system prompt 注入。",
+    "startCardAgentPrompt": "请检查当前项目的 Agent 模式文件和记忆机制是否完整。",
     "scrollBottomTitle": "滚动到底部",
     "scrollBottomAria": "滚动到底部",
     "composerPlaceholder": "要求后续变更",

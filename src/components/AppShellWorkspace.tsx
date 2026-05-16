@@ -9,6 +9,7 @@ import type {
   WorkspaceProject,
   WorkspaceThread,
 } from './types'
+import { AgentModeMenu } from './AgentModeMenu'
 import { AppFilePanel } from './AppFilePanel'
 import { ChatPage, type ChatPageHandle } from './chat/ChatPage'
 import { DocsPage } from './DocsPage'
@@ -70,6 +71,7 @@ export function AppShellWorkspace({
           </span>
           <div className="app-workspace-drag-gap draggable" aria-hidden="true" />
           <div className="app-workspace-actions no-drag">
+            <AgentModeMenu project={activeProject} />
             <button
               type="button"
               className={`btn btn-toolbar${filePanelOpen ? ' is-active' : ''}`}

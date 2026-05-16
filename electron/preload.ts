@@ -33,6 +33,12 @@ contextBridge.exposeInMainWorld('desktop', {
   listAgentContext(rootPath: string) {
     return ipcRenderer.invoke('desktop:list-agent-context', rootPath)
   },
+  getAgentModeStatus(rootPath: string) {
+    return ipcRenderer.invoke('desktop:get-agent-mode-status', rootPath)
+  },
+  ensureAgentModeFiles(rootPath: string) {
+    return ipcRenderer.invoke('desktop:ensure-agent-mode-files', rootPath)
+  },
   getChatWorkspace() {
     return ipcRenderer.invoke('chat-workspace:get')
   },

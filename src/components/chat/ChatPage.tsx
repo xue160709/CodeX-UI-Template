@@ -36,10 +36,10 @@ import type {
   WorkspaceThread,
 } from '../types'
 import { AgentInputPromptModal, type PendingUserInputPrompt, type UserInputDecision } from './AgentInputPromptModal'
-import { ChatConversation } from './ChatConversation'
+import { ChatStartView } from './ChatStartView'
+import { ChatThreadView } from './ChatThreadView'
 import { Composer } from './Composer'
 import type { BuiltInSlashCommand, ChatModelMenuRow, ComposerSuggestion, ComposerTrigger, PermissionModeRow } from './local-types'
-import { ProjectHome, ProjectHomeEyebrow } from './ProjectHome'
 
 const SETTINGS_CHANGED_EVENT = 'claude-agent-settings:changed'
 const MAX_COMPOSER_SUGGESTIONS = 64
@@ -1197,6 +1197,69 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     if (!isRunningRef.current) void submitPrompt(inputValue, undefined, pendingAttachments)
   }
 
+  const useStartSuggestion = useCallback((prompt: string) => {
+    setInputValue(prompt)
+    setComposerSelection({ start: prompt.length, end: prompt.length })
+    setDismissedAutocompleteKey('')
+    requestAnimationFrame(() => {
+      const input = chatInputRef.current
+      if (!input) return
+      input.focus()
+      input.setSelectionRange(prompt.length, prompt.length)
+    })
+  }, [])
+
+  const composer = (
+    <Composer
+      inputValue={inputValue}
+      isRunning={isRunning}
+      activeModelSupportsImages={activeModelSupportsImages}
+      pendingAttachments={pendingAttachments}
+      permissionMode={permissionMode}
+      permissionModeLabel={permissionModeLabel}
+      permissionModeRows={permissionModeRows}
+      permissionModeOpen={permissionModeOpen}
+      permissionModePopoverBox={permissionModePopoverBox}
+      modelPickerOpen={modelPickerOpen}
+      modelMenuRows={modelMenuRows}
+      modelMenuSelectionKey={modelMenuSelectionKey}
+      modelPopoverBox={modelPopoverBox}
+      displayModelName={compactModelName(globalDisplayModel, t)}
+      composerAutocompleteOpen={composerAutocompleteOpen}
+      composerAutocompleteBox={composerAutocompleteBox}
+      activeComposerTrigger={activeComposerTrigger}
+      composerSuggestions={composerSuggestions}
+      composerSuggestionIndex={composerSuggestionIndex}
+      chatInputRef={chatInputRef}
+      composerAutocompleteSurfaceRef={composerAutocompleteSurfaceRef}
+      permissionModePickerRef={permissionModePickerRef}
+      permissionModePopoverAnchorRef={permissionModePopoverAnchorRef}
+      permissionModePopoverSurfaceRef={permissionModePopoverSurfaceRef}
+      modelPickerRef={modelPickerRef}
+      modelPopoverAnchorRef={modelPopoverAnchorRef}
+      modelPopoverSurfaceRef={modelPopoverSurfaceRef}
+      setPermissionMode={setPermissionMode}
+      setPermissionModeOpen={setPermissionModeOpen}
+      setModelPickerOpen={setModelPickerOpen}
+      setComposerSuggestionIndex={setComposerSuggestionIndex}
+      onInputChange={(value, selectionStart, selectionEnd) => {
+        setInputValue(value)
+        setComposerSelection({ start: selectionStart, end: selectionEnd })
+        setDismissedAutocompleteKey('')
+      }}
+      onCompositionStart={() => setIsComposingText(true)}
+      onCompositionEnd={() => setIsComposingText(false)}
+      onInputKeyDown={handleInputKeydown}
+      onSyncComposerSelection={syncComposerSelection}
+      onFormSubmit={handleFormSubmit}
+      onSendClick={handleSendClick}
+      onAddComposerAttachments={() => void addComposerAttachments()}
+      onRemoveComposerAttachment={removeComposerAttachment}
+      onInsertComposerSuggestion={insertComposerSuggestion}
+      onPickChatMenuRow={(row) => void pickChatMenuRow(row)}
+    />
+  )
+
   return (
     <section
       className={`chat-page${hasMessages ? ' has-messages' : ''}`}
@@ -1206,64 +1269,16 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       aria-hidden={hidden}
     >
       {hasMessages ? (
-        <ChatConversation
+        <ChatThreadView
           items={chatItems}
+          composer={composer}
           scrollRegionRef={scrollRegionRef}
           showScrollButton={showScrollButton}
           onScrollToBottom={scrollToBottom}
         />
       ) : (
-        <ProjectHome />
+        <ChatStartView project={activeProject} composer={composer} onUseSuggestion={useStartSuggestion} />
       )}
-      <Composer
-        inputValue={inputValue}
-        isRunning={isRunning}
-        activeModelSupportsImages={activeModelSupportsImages}
-        pendingAttachments={pendingAttachments}
-        permissionMode={permissionMode}
-        permissionModeLabel={permissionModeLabel}
-        permissionModeRows={permissionModeRows}
-        permissionModeOpen={permissionModeOpen}
-        permissionModePopoverBox={permissionModePopoverBox}
-        modelPickerOpen={modelPickerOpen}
-        modelMenuRows={modelMenuRows}
-        modelMenuSelectionKey={modelMenuSelectionKey}
-        modelPopoverBox={modelPopoverBox}
-        displayModelName={compactModelName(globalDisplayModel, t)}
-        composerAutocompleteOpen={composerAutocompleteOpen}
-        composerAutocompleteBox={composerAutocompleteBox}
-        activeComposerTrigger={activeComposerTrigger}
-        composerSuggestions={composerSuggestions}
-        composerSuggestionIndex={composerSuggestionIndex}
-        chatInputRef={chatInputRef}
-        composerAutocompleteSurfaceRef={composerAutocompleteSurfaceRef}
-        permissionModePickerRef={permissionModePickerRef}
-        permissionModePopoverAnchorRef={permissionModePopoverAnchorRef}
-        permissionModePopoverSurfaceRef={permissionModePopoverSurfaceRef}
-        modelPickerRef={modelPickerRef}
-        modelPopoverAnchorRef={modelPopoverAnchorRef}
-        modelPopoverSurfaceRef={modelPopoverSurfaceRef}
-        setPermissionMode={setPermissionMode}
-        setPermissionModeOpen={setPermissionModeOpen}
-        setModelPickerOpen={setModelPickerOpen}
-        setComposerSuggestionIndex={setComposerSuggestionIndex}
-        onInputChange={(value, selectionStart, selectionEnd) => {
-          setInputValue(value)
-          setComposerSelection({ start: selectionStart, end: selectionEnd })
-          setDismissedAutocompleteKey('')
-        }}
-        onCompositionStart={() => setIsComposingText(true)}
-        onCompositionEnd={() => setIsComposingText(false)}
-        onInputKeyDown={handleInputKeydown}
-        onSyncComposerSelection={syncComposerSelection}
-        onFormSubmit={handleFormSubmit}
-        onSendClick={handleSendClick}
-        onAddComposerAttachments={() => void addComposerAttachments()}
-        onRemoveComposerAttachment={removeComposerAttachment}
-        onInsertComposerSuggestion={insertComposerSuggestion}
-        onPickChatMenuRow={(row) => void pickChatMenuRow(row)}
-      />
-      {!hasMessages ? <ProjectHomeEyebrow project={activeProject} /> : null}
       {activeUserInputPrompt
         ? createPortal(
             <AgentInputPromptModal prompt={activeUserInputPrompt} onResolve={(decision) => void resolveActiveUserInputPrompt(decision)} />,

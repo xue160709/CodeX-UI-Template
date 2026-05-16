@@ -79,7 +79,20 @@
   },
   "workspace": {
     "fileTree": "File tree",
-    "toggleFilePanel": "Toggle file tree panel"
+    "toggleFilePanel": "Toggle file tree panel",
+    "agentModeTitle": "Agent Mode",
+    "agentModeToggle": "Enable Agent Mode",
+    "agentModeToggleDesc": "Create and inject AGENTS/MEMORY/SOUL/USER/IDENTITY context.",
+    "agentModeReady": "Agent Mode is enabled for this project.",
+    "agentModeNeedsSetup": "Turn this on to prepare OpenClaw-style identity and memory files.",
+    "agentModeUnavailable": "Agent Mode setup is unavailable in this environment.",
+    "agentModeEnabling": "Preparing Agent Mode files...",
+    "agentModeFailed": "Failed to enable Agent Mode",
+    "agentModeFileStatus": {
+      "created": "Created",
+      "updated": "Updated",
+      "exists": "Exists"
+    }
   },
   "thread": {
     "newThreadTitle": "New thread"
@@ -213,6 +226,16 @@
   "chat": {
     "ariaPage": "Claude Agent chat",
     "emptyHeading": "What should we build?",
+    "startCardsAria": "Starter suggestions",
+    "startCardPlanTitle": "Plan an MVP",
+    "startCardPlanDesc": "Turn this project into requirements, scope, and a dev plan.",
+    "startCardPlanPrompt": "Read the current project and help me shape an MVP development plan.",
+    "startCardRefactorTitle": "Find refactor points",
+    "startCardRefactorDesc": "Review structure and duplicated logic before proposing changes.",
+    "startCardRefactorPrompt": "Review the current frontend structure and identify the component boundaries most worth refactoring.",
+    "startCardAgentTitle": "Prepare Agent memory",
+    "startCardAgentDesc": "Check Agent files, memory folders, and system prompt injection.",
+    "startCardAgentPrompt": "Check whether this project's Agent Mode files and memory mechanism are complete.",
     "scrollBottomTitle": "Scroll to bottom",
     "scrollBottomAria": "Scroll to bottom",
     "composerPlaceholder": "Describe the next change",

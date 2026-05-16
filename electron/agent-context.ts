@@ -63,6 +63,7 @@ const MAX_SEARCH_RESULTS = 24
 const MAX_SEARCH_DEPTH = 10
 const MAX_INSTRUCTION_FILE_CHARS = 24_000
 const MAX_INSTRUCTION_TOTAL_CHARS = 72_000
+const AGENT_MODE_ROOT_FILES = ['SOUL.md', 'IDENTITY.md', 'USER.md', 'MEMORY.md'] as const
 
 export async function discoverAgentContext(rootPath: string): Promise<AgentContextResult> {
   const resolvedRootPath = resolveProjectPath(rootPath)
@@ -311,6 +312,17 @@ async function readInstructionFiles(sourceRoot: ContextSourceRoot): Promise<Agen
       const filePath = path.join(projectDirectory, candidate)
       await pushInstructionFile(files, filePath, sourceRoot, candidate)
     }
+    for (const candidate of AGENT_MODE_ROOT_FILES) {
+      const filePath = path.join(projectDirectory, candidate)
+      await pushInstructionFile(files, filePath, sourceRoot, candidate)
+    }
+    if (!(await exists(path.join(projectDirectory, 'MEMORY.md')))) {
+      await pushInstructionFile(files, path.join(projectDirectory, 'memory.md'), sourceRoot, 'memory.md')
+    }
+    for (const candidate of recentDailyMemoryFileNames()) {
+      const filePath = path.join(projectDirectory, 'memory', candidate)
+      await pushInstructionFile(files, filePath, sourceRoot, candidate)
+    }
   }
 
   const cursorRuleFiles =
@@ -422,7 +434,7 @@ async function buildAppendSystemPrompt(catalog: AgentContextCatalog): Promise<st
 
   let remaining = MAX_INSTRUCTION_TOTAL_CHARS
   const sections = [
-    'The host application loaded additional project instructions and compatibility metadata from AGENT/AGENTS, .agent, .agents, and .cursor files. Treat these as lower priority than explicit user instructions and higher priority than generic defaults.',
+    'The host application loaded additional project instructions, Agent Mode identity and memory files, and compatibility metadata from AGENT/AGENTS, SOUL/IDENTITY/USER/MEMORY, memory/, .agent, .agents, and .cursor files. Treat these as lower priority than explicit user instructions and higher priority than generic defaults.',
   ]
 
   if (hostSkills.length > 0) {
@@ -695,6 +707,23 @@ function formatContextRelativePath(filePath: string, sourceRoot: ContextSourceRo
 
 function formatScope(scope: AgentContextScope): string {
   return scope === 'user' ? 'user' : 'project'
+}
+
+function recentDailyMemoryFileNames(): string[] {
+  return [0, -1].map((offset) => `${formatLocalDate(addDays(new Date(), offset))}.md`)
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 async function readTextFile(filePath: string, maxChars: number): Promise<string> {

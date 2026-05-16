@@ -492,6 +492,11 @@ export function AppShellSidebar({
                                           }}
                                           onContextMenu={(event) => openSkillMenu(event, project.id, skill)}
                                         >
+                                          <span className="app-skill-lead" aria-hidden="true">
+                                            <span className="app-skill-icon">
+                                              <IconInline name="chip" />
+                                            </span>
+                                          </span>
                                           <button
                                             type="button"
                                             className="app-skill-select"
@@ -509,9 +514,6 @@ export function AppShellSidebar({
                                               })
                                             }}
                                           >
-                                            <span className="app-skill-icon" aria-hidden="true">
-                                              <IconInline name="chip" />
-                                            </span>
                                             <span className="app-skill-title">{skill.title}</span>
                                           </button>
                                           <div className="app-skill-trailing">

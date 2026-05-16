@@ -6,3 +6,39 @@ export type DesktopPreferences = {
 
 /** 托盘菜单触发的动作（与主进程 IPC 载荷一致） */
 export type TrayMenuAction = 'new-thread' | 'open-project'
+
+export type AgentModeFileStatus = 'created' | 'updated' | 'exists'
+
+export type AgentModeFileChange = {
+  relativePath: string
+  path: string
+  status: AgentModeFileStatus
+}
+
+export type AgentModeStatusResult =
+  | {
+      ok: true
+      rootPath: string
+      enabled: boolean
+      instructionFile: string
+      missingFiles: string[]
+    }
+  | {
+      ok: false
+      rootPath: string
+      message: string
+    }
+
+export type AgentModeFilesResult =
+  | {
+      ok: true
+      rootPath: string
+      instructionFile: string
+      files: AgentModeFileChange[]
+      message: string
+    }
+  | {
+      ok: false
+      rootPath: string
+      message: string
+    }
