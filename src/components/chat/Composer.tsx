@@ -259,7 +259,6 @@ export function Composer({
             </div>
           </div>
           <div className="composer-actions composer-actions--end">
-            <span className={`composer-spinner${isRunning ? ' is-visible' : ''}`} id="composer-spinner" aria-hidden="true" />
             <div className="composer-model-picker" ref={modelPickerRef}>
               <button
                 ref={modelPopoverAnchorRef}

@@ -2766,33 +2766,9 @@ button.app-file-tree-row {
   cursor: not-allowed;
 }
 
-.composer-spinner {
-  display: none;
-  width: 16px;
-  height: 16px;
-  border: 2px solid color-mix(in oklab, var(--color-token-text-secondary) 22%, transparent);
-  border-top-color: var(--color-token-text-secondary);
-  border-radius: var(--radius-full);
-  animation: composer-spin 0.8s linear infinite;
-}
-
-.composer-spinner.is-visible {
-  display: inline-block;
-}
-
 @keyframes composer-spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .composer-spinner,
-  .app-thread-running::before,
-  .tool-row--running .tool-row__dot,
-  .activity-row--running .activity-row__dot,
-  .thinking-row--running .thinking-row__dot {
-    animation: none;
   }
 }
 
