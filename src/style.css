@@ -1063,7 +1063,7 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   top: calc(100% + var(--spacing));
   right: 0;
   width: min(360px, calc(100vw - var(--spacing) * 6));
-  padding: calc(var(--spacing) * 2);
+  padding: calc(var(--spacing) * 3);
   border: 1px solid var(--color-token-border);
   border-radius: var(--radius-lg);
   background: var(--color-token-main-surface-primary);
@@ -1072,28 +1072,14 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
     0 0 0 1px color-mix(in oklab, var(--color-token-border) 45%, transparent);
 }
 
-.agent-mode-popover__header {
+.agent-mode-controls {
   display: flex;
-  min-width: 0;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: calc(var(--spacing) * 2);
-  padding: calc(var(--spacing) * 1) calc(var(--spacing) * 1.5) calc(var(--spacing) * 2);
+  flex-direction: column;
+  gap: 0;
 }
 
-.agent-mode-popover__header > span:first-child {
-  color: var(--color-token-text-primary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
-}
-
-.agent-mode-popover__header > span:last-child {
+.agent-mode-controls--embedded {
   min-width: 0;
-  overflow: hidden;
-  color: var(--color-token-text-tertiary);
-  font-size: var(--text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .agent-mode-switch {
@@ -1101,24 +1087,38 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: calc(var(--spacing) * 3);
-  min-height: 64px;
-  padding: calc(var(--spacing) * 2);
-  border: 1px solid var(--color-token-border-light);
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--color-token-background-secondary) 62%, transparent);
+  padding-block: calc(var(--spacing) * 3);
+  padding-inline: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   cursor: pointer;
 }
 
-.agent-mode-switch:focus-within {
-  border-color: color-mix(in oklab, var(--color-token-foreground) 42%, transparent);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-token-foreground) 14%, transparent);
+.agent-mode-switch:first-child {
+  padding-block-start: calc(var(--spacing) * 2);
+}
+
+.agent-mode-controls--embedded .agent-mode-switch:first-child {
+  /* 与文件树面板 body 顶衬叠加，避免「Agent」Tab 内容显得下沉过多 */
+  padding-block-start: calc(var(--spacing) * 1);
+}
+
+.agent-mode-popover > .agent-mode-controls .agent-mode-switch:first-child {
+  /* 浮层已有 padding，首行再收紧顶距 */
+  padding-block-start: calc(var(--spacing) * 1);
+}
+
+.agent-mode-switch + .agent-mode-switch {
+  border-top: 1px solid var(--color-token-border-light);
 }
 
 .agent-mode-switch__copy {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 2px;
+  gap: calc(var(--spacing) * 1);
 }
 
 .agent-mode-switch__copy > span:first-child {
@@ -1128,54 +1128,92 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
 }
 
 .agent-mode-switch__copy > span:last-child {
-  color: var(--color-token-text-secondary);
-  font-size: var(--text-xs);
-  line-height: 1.4;
-}
-
-.agent-mode-popover__status {
-  padding: calc(var(--spacing) * 2) calc(var(--spacing) * 1.5) var(--spacing);
-  color: var(--color-token-text-secondary);
+  color: var(--color-token-description-foreground);
   font-size: var(--text-xs);
   line-height: 1.45;
 }
 
-.agent-mode-file-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  max-height: 180px;
-  margin: var(--spacing) 0 0;
-  padding: 0;
-  overflow-y: auto;
-  list-style: none;
+.agent-mode-panel-body {
+  flex: 1;
+  min-height: 0;
 }
 
-.agent-mode-file-list li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: calc(var(--spacing) * 2);
-  padding: calc(var(--spacing) * 1.25) calc(var(--spacing) * 1.5);
-  border-radius: var(--radius-sm);
+.app-workspace-side-panel-panes {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.app-workspace-side-panel-pane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-workspace-side-panel-pane[hidden] {
+  display: none !important;
+}
+
+.app-workspace-side-panel-tabs {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: calc(var(--spacing) * 0.5);
+}
+
+.app-workspace-side-panel-tab {
+  display: inline-flex;
+  max-width: 50%;
+  align-items: center;
+  gap: calc(var(--spacing) * 1);
+  min-width: 0;
+  padding: calc(var(--spacing) * 1) calc(var(--spacing) * 2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
   color: var(--color-token-text-secondary);
   font-size: var(--text-xs);
-  background: transparent;
+  font-weight: var(--font-weight-medium);
+  line-height: 16px;
+  cursor: pointer;
+  transition:
+    background var(--transition-duration-basic) var(--transition-ease-basic),
+    color var(--transition-duration-basic) var(--transition-ease-basic),
+    border-color var(--transition-duration-basic) var(--transition-ease-basic);
 }
 
-.agent-mode-file-list li:hover {
-  background: var(--color-token-list-hover-background);
-}
-
-.agent-mode-file-list li > span:first-child {
-  min-width: 0;
+.app-workspace-side-panel-tab span {
   overflow: hidden;
-  font-family: var(--font-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.agent-mode-file-list li > span:last-child {
-  color: var(--color-token-text-tertiary);
+.app-workspace-side-panel-tab:hover {
+  background: color-mix(in oklab, var(--color-token-foreground) 6%, transparent);
+  color: var(--color-token-text-primary);
+}
+
+.app-workspace-side-panel-tab:focus-visible {
+  border-color: color-mix(in oklab, var(--color-token-foreground) 42%, transparent);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-token-foreground) 14%, transparent);
+}
+
+.app-workspace-side-panel-tab.is-selected {
+  border-color: var(--color-token-border);
+  background: color-mix(in oklab, var(--color-token-main-surface-primary) 88%, var(--color-token-foreground));
+  color: var(--color-token-text-primary);
+}
+
+.app-file-tree-pane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .app-workspace-content {
@@ -1314,6 +1352,12 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   overflow-y: auto;
   overflow-x: hidden;
   padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 1.5) calc(var(--spacing) * 3);
+}
+
+/* Agent 侧栏：左侧与「项目名」条 (.app-file-panel-project)、侧栏顶栏左侧留白对齐；右侧与顶栏 actions（关闭等）一致 */
+.app-file-panel-body.agent-mode-panel-body {
+  padding-inline: calc(var(--spacing) * 3) calc(var(--spacing) * 2);
+  padding-block: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
 }
 
 .app-file-panel-state {

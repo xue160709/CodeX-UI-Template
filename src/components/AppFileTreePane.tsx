@@ -1,20 +1,34 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { IconInline } from '../icon-inline'
 import { useI18n } from '../i18n/i18n'
 import type { FileTreeNode, FileTreeResult, WorkspaceProject } from './types'
 
-type AppFilePanelProps = {
-  open: boolean
-  project: WorkspaceProject
-  onClose: () => void
+export type AppFileTreePaneHandle = {
+  refresh: () => void
 }
 
-export function AppFilePanel({ open, project, onClose }: AppFilePanelProps) {
+type AppFileTreePaneProps = {
+  project: WorkspaceProject
+  /** 侧栏打开且当前为「目录」标签时为 true；隐藏时保留列表与展开状态 */
+  isVisible: boolean
+}
+
+export const AppFileTreePane = forwardRef<AppFileTreePaneHandle, AppFileTreePaneProps>(function AppFileTreePane(
+  { project, isVisible },
+  ref,
+) {
   const { t } = useI18n()
   const [result, setResult] = useState<FileTreeResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set())
   const loadRequestRef = useRef(0)
+  const lastLoadedPathRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    setResult(null)
+    setExpandedPaths(new Set())
+    lastLoadedPathRef.current = null
+  }, [project.path])
 
   const loadProjectFiles = useCallback(async () => {
     const requestId = loadRequestRef.current + 1
@@ -45,23 +59,28 @@ export function AppFilePanel({ open, project, onClose }: AppFilePanelProps) {
         message: error instanceof Error ? error.message : t('filePanel.loadFailed'),
       })
     } finally {
-      if (loadRequestRef.current === requestId) setLoading(false)
+      if (loadRequestRef.current === requestId) {
+        setLoading(false)
+        lastLoadedPathRef.current = project.path
+      }
     }
   }, [project.path, t])
 
   useEffect(() => {
-    if (!open) return
+    if (!isVisible) return
+    if (lastLoadedPathRef.current === project.path) return
     void loadProjectFiles()
-  }, [loadProjectFiles, open])
+  }, [isVisible, project.path, loadProjectFiles])
 
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose, open])
+  useImperativeHandle(
+    ref,
+    () => ({
+      refresh: () => {
+        void loadProjectFiles()
+      },
+    }),
+    [loadProjectFiles],
+  )
 
   const summary = useMemo(() => (result?.ok ? countTreeNodes(result.nodes) : null), [result])
 
@@ -78,35 +97,7 @@ export function AppFilePanel({ open, project, onClose }: AppFilePanelProps) {
   }, [])
 
   return (
-    <aside
-      className={`app-file-panel${open ? ' is-open' : ''}`}
-      id="app-file-panel"
-      aria-label={t('filePanel.aria')}
-      aria-hidden={!open}
-      inert={open ? undefined : true}
-    >
-      <div className="app-file-panel-header">
-        <div className="app-file-panel-heading">
-          <IconInline name="files" />
-          <span>{t('filePanel.heading')}</span>
-        </div>
-        <div className="app-file-panel-actions">
-          <button
-            type="button"
-            className="btn btn-toolbar"
-            title={t('filePanel.refreshTitle')}
-            aria-label={t('filePanel.refreshAria')}
-            disabled={loading}
-            onClick={() => void loadProjectFiles()}
-          >
-            <IconInline name="refresh" />
-          </button>
-          <button type="button" className="btn btn-toolbar" title={t('filePanel.closeTitle')} aria-label={t('filePanel.closeAria')} onClick={onClose}>
-            <IconInline name="x" />
-          </button>
-        </div>
-      </div>
-
+    <div className="app-file-tree-pane">
       <div className="app-file-panel-project">
         <span className="app-file-panel-project-name" title={result?.rootPath ?? project.path}>
           {result?.ok ? result.rootName : project.name}
@@ -135,9 +126,9 @@ export function AppFilePanel({ open, project, onClose }: AppFilePanelProps) {
           </>
         ) : null}
       </div>
-    </aside>
+    </div>
   )
-}
+})
 
 type FileTreeRowsProps = {
   nodes: FileTreeNode[]

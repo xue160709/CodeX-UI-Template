@@ -82,6 +82,8 @@
   "workspace": {
     "fileTree": "File tree",
     "toggleFilePanel": "Toggle file tree panel",
+    "sidePanelAria": "Workspace side panel",
+    "sidePanelTabsAria": "Side panel sections",
     "agentModeTitle": "Agent Mode",
     "agentModeToggle": "Enable Agent Mode",
     "agentModeToggleDesc": "Prepare AGENT/SOUL/MEMORY and inject USER/IDENTITY from settings.",
@@ -94,12 +96,7 @@
     "agentModeEnabling": "Preparing Agent Mode files...",
     "agentModeDisabling": "Turning off Agent Mode...",
     "todoModeUpdating": "Updating TODO Mode...",
-    "agentModeFailed": "Failed to enable Agent Mode",
-    "agentModeFileStatus": {
-      "created": "Created",
-      "updated": "Updated",
-      "exists": "Exists"
-    }
+    "agentModeFailed": "Failed to enable Agent Mode"
   },
   "thread": {
     "newThreadTitle": "New thread"
@@ -254,7 +251,7 @@
   },
   "chat": {
     "ariaPage": "Claude Agent chat",
-    "emptyHeading": "What should we build?",
+    "emptyHeading": "What do you need help with?",
     "startCardsAria": "Starter suggestions",
     "startCardPlanTitle": "Plan an MVP",
     "startCardPlanDesc": "Turn this project into requirements, scope, and a dev plan.",

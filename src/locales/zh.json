@@ -82,6 +82,8 @@
   "workspace": {
     "fileTree": "文件树",
     "toggleFilePanel": "切换文件树面板",
+    "sidePanelAria": "工作区侧栏",
+    "sidePanelTabsAria": "侧栏分区",
     "agentModeTitle": "Agent 模式",
     "agentModeToggle": "开启 Agent 模式",
     "agentModeToggleDesc": "准备 AGENT/SOUL/MEMORY，并注入设置里的 USER/IDENTITY。",
@@ -94,12 +96,7 @@
     "agentModeEnabling": "正在准备 Agent 模式文件...",
     "agentModeDisabling": "正在关闭 Agent 模式...",
     "todoModeUpdating": "正在更新 TODO 模式...",
-    "agentModeFailed": "开启 Agent 模式失败",
-    "agentModeFileStatus": {
-      "created": "已创建",
-      "updated": "已更新",
-      "exists": "已存在"
-    }
+    "agentModeFailed": "开启 Agent 模式失败"
   },
   "thread": {
     "newThreadTitle": "新对话"
@@ -254,7 +251,7 @@
   },
   "chat": {
     "ariaPage": "Claude Agent 聊天",
-    "emptyHeading": "我们该构建什么？",
+    "emptyHeading": "你需要我做什么？",
     "startCardsAria": "开始建议",
     "startCardPlanTitle": "梳理 MVP 计划",
     "startCardPlanDesc": "用当前项目做一轮需求、范围和开发计划整理。",

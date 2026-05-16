@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { IconInline } from '../icon-inline'
 import { useI18n } from '../i18n/i18n'
 import type {
@@ -9,11 +9,19 @@ import type {
   WorkspaceProject,
   WorkspaceThread,
 } from './types'
+import { AgentModeControls } from './AgentModeControls'
 import { AgentModeMenu } from './AgentModeMenu'
-import { AppFilePanel } from './AppFilePanel'
+import { AppFileTreePane, type AppFileTreePaneHandle } from './AppFileTreePane'
+import { AppWorkspaceSidePanel, type WorkspaceSidePanelTab } from './AppWorkspaceSidePanel'
 import { ChatPage, type ChatPageHandle } from './chat/ChatPage'
 import { DocsPage } from './DocsPage'
 import { SettingsPage } from './SettingsPage'
+import { useWorkspaceAgentMode } from './useWorkspaceAgentMode'
+
+type SidePanelState = {
+  open: boolean
+  tab: WorkspaceSidePanelTab
+}
 
 type AppShellWorkspaceProps = {
   workspaceTitle: string
@@ -54,11 +62,34 @@ export function AppShellWorkspace({
 }: AppShellWorkspaceProps) {
   const { t } = useI18n()
   const isSettingsChromeHidden = activeViewId === 'settings'
-  const [filePanelOpen, setFilePanelOpen] = useState(false)
+  const [sidePanel, setSidePanel] = useState<SidePanelState>(() => ({ open: false, tab: 'files' }))
+  const filePaneRef = useRef<AppFileTreePaneHandle>(null)
+  const agentMode = useWorkspaceAgentMode(activeProject)
 
   useEffect(() => {
-    if (activeViewId === 'settings') setFilePanelOpen(false)
+    if (activeViewId === 'settings') setSidePanel((prev) => ({ ...prev, open: false }))
   }, [activeViewId])
+
+  useEffect(() => {
+    if (!agentMode.enabled && sidePanel.tab === 'agent') {
+      setSidePanel((prev) => ({ ...prev, tab: 'files' }))
+    }
+  }, [agentMode.enabled, sidePanel.tab])
+
+  const toggleSidePanelTab = useCallback((tab: WorkspaceSidePanelTab) => {
+    setSidePanel((prev) => {
+      if (prev.open && prev.tab === tab) {
+        return { ...prev, open: false }
+      }
+      return { open: true, tab }
+    })
+  }, [])
+
+  const openSidePanelWithTab = useCallback((tab: WorkspaceSidePanelTab) => {
+    setSidePanel({ open: true, tab })
+  }, [])
+
+  const folderToolbarActive = sidePanel.open && sidePanel.tab === 'files'
 
   return (
     <div className="app-workspace">
@@ -71,23 +102,25 @@ export function AppShellWorkspace({
           </span>
           <div className="app-workspace-drag-gap draggable" aria-hidden="true" />
           <div className="app-workspace-actions no-drag">
-            <AgentModeMenu project={activeProject} />
+            <AgentModeMenu
+              agent={agentMode}
+              sidePanelOpen={sidePanel.open}
+              sidePanelTab={sidePanel.tab}
+              onToggleSidePanelTab={toggleSidePanelTab}
+              onAgentEnabledFromPopover={() => openSidePanelWithTab('agent')}
+            />
             <button
               type="button"
-              className={`btn btn-toolbar${filePanelOpen ? ' is-active' : ''}`}
+              className={`btn btn-toolbar${folderToolbarActive ? ' is-active' : ''}`}
               id="btn-toggle-file-panel"
               title={t('workspace.fileTree')}
               aria-label={t('workspace.toggleFilePanel')}
               aria-controls="app-file-panel"
-              aria-expanded={filePanelOpen}
-              onClick={() => setFilePanelOpen((open) => !open)}
+              aria-expanded={folderToolbarActive}
+              onClick={() => toggleSidePanelTab('files')}
             >
               <IconInline name="folder" />
             </button>
-            {/* <button type="button" className="btn btn-ghost" id="btn-new-thread" onClick={onNewThread}>
-              <IconInline name="plus" />
-              <span>新对话</span>
-            </button> */}
           </div>
         </header>
       )}
@@ -115,7 +148,32 @@ export function AppShellWorkspace({
             onShowProjectSkillsInSidebarChange={onShowProjectSkillsInSidebarChange}
           />
         </main>
-        <AppFilePanel open={filePanelOpen} project={activeProject} onClose={() => setFilePanelOpen(false)} />
+        <AppWorkspaceSidePanel
+          open={sidePanel.open}
+          activeTab={sidePanel.tab}
+          onActiveTabChange={(tab) => setSidePanel((prev) => ({ ...prev, open: true, tab }))}
+          onClose={() => setSidePanel((prev) => ({ ...prev, open: false }))}
+          showAgentTab={agentMode.enabled}
+          filePaneRef={filePaneRef}
+          filesPane={<AppFileTreePane ref={filePaneRef} project={activeProject} isVisible={sidePanel.open && sidePanel.tab === 'files'} />}
+          agentPane={
+            <div className="app-file-panel-body agent-mode-panel-body">
+              <AgentModeControls
+                variant="embedded"
+                enabled={agentMode.enabled}
+                todoEnabled={agentMode.todoEnabled}
+                loading={agentMode.loading}
+                onAgentSwitchChange={(checked) => {
+                  if (checked) void agentMode.enableAgentMode()
+                  else void agentMode.updateAgentModeState({ enabled: false })
+                }}
+                onTodoSwitchChange={(checked) => {
+                  void agentMode.updateAgentModeState({ todoEnabled: checked })
+                }}
+              />
+            </div>
+          }
+        />
       </div>
     </div>
   )
