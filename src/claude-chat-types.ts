@@ -2,6 +2,11 @@ export type ClaudeChatSubmitPayload = {
   text: string
   attachments?: ClaudeChatAttachment[]
   threadId?: string
+  /**
+   * 上次 Agent SDK 返回的会话 ID（持久化在 chatState）。进程重启后主进程会丢失内存中的 resume 状态，
+   * 传此字段可恢复同一 Claude Agent 会话；本会话内主进程已有 session 时会被忽略。
+   */
+  sessionId?: string
   /** 工作区项目文件夹绝对路径；未传时回退到应用根目录 */
   cwd?: string
   permissionMode?: ClaudePermissionMode

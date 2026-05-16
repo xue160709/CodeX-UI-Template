@@ -117,6 +117,12 @@ export class ClaudeAgentRunner {
       void this.cancel(previousRequestId)
     }
 
+    const threadState = this.getThreadRuntimeState(threadId)
+    const persistedSession = typeof payload.sessionId === 'string' ? payload.sessionId.trim() : ''
+    if (persistedSession && !threadState.sessionId) {
+      threadState.sessionId = persistedSession
+    }
+
     const activeRequest: ActiveRequest = {
       requestId,
       assistantMessageId: `assistant-${requestId}`,

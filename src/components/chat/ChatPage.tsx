@@ -55,6 +55,8 @@ type ChatPageProps = {
   hidden: boolean
   activeProject: WorkspaceProject
   activeThread: WorkspaceThread | undefined
+  /** 用于按 threadId 读取持久化的 sessionId（应用重启后恢复 Agent SDK 会话） */
+  threads: WorkspaceThread[]
   projects: WorkspaceProject[]
   threadRunStates: Record<string, ThreadRunState>
   onStatusChange: (text: string) => void
@@ -102,6 +104,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     hidden,
     activeProject,
     activeThread,
+    threads,
     projects,
     threadRunStates,
     onStatusChange,
@@ -965,6 +968,8 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     }
     if (threadRunStatesRef.current[submittingThreadId]) return
 
+    const resumeSessionId = threads.find((th) => th.id === submittingThreadId)?.chatState.sessionId
+
     const userMessage: ChatMessageItem = {
       type: 'message',
       id: `user-${Date.now()}`,
@@ -1011,6 +1016,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         text,
         attachments: attachmentsForSubmit,
         threadId: submittingThreadId,
+        sessionId: resumeSessionId,
         cwd: projectForSubmit.path,
         permissionMode,
       })

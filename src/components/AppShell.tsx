@@ -806,6 +806,7 @@ export function AppShell() {
           settingsCategory={settingsCategory}
           activeProject={activeProject}
           activeThread={activeThread}
+          threads={chatWorkspace.threads}
           projects={chatWorkspace.projects}
           threadRunStates={threadRunStates}
           chatRef={chatRef}

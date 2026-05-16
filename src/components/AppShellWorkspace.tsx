@@ -30,6 +30,7 @@ type AppShellWorkspaceProps = {
   settingsCategory: SettingsCategoryId
   activeProject: WorkspaceProject
   activeThread: WorkspaceThread | undefined
+  threads: WorkspaceThread[]
   projects: WorkspaceProject[]
   threadRunStates: Record<string, ThreadRunState>
   chatRef: RefObject<ChatPageHandle | null>
@@ -49,6 +50,7 @@ export function AppShellWorkspace({
   settingsCategory,
   activeProject,
   activeThread,
+  threads,
   projects,
   threadRunStates,
   chatRef,
@@ -131,6 +133,7 @@ export function AppShellWorkspace({
             hidden={activeViewId !== 'home'}
             activeProject={activeProject}
             activeThread={activeThread}
+            threads={threads}
             projects={projects}
             threadRunStates={threadRunStates}
             onStatusChange={onStatusChange}
