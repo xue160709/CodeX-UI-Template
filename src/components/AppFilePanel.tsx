@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { IconInline } from '../icon-inline'
+import { useI18n } from '../i18n/i18n'
 import type { FileTreeNode, FileTreeResult, WorkspaceProject } from './types'
 
 type AppFilePanelProps = {
@@ -9,6 +10,7 @@ type AppFilePanelProps = {
 }
 
 export function AppFilePanel({ open, project, onClose }: AppFilePanelProps) {
+  const { t } = useI18n()
   const [result, setResult] = useState<FileTreeResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set())
@@ -24,7 +26,7 @@ export function AppFilePanel({ open, project, onClose }: AppFilePanelProps) {
       setResult({
         ok: false,
         rootPath: project.path,
-        message: '当前运行环境不支持读取文件树',
+        message: t('filePanel.unsupported'),
       })
       setLoading(false)
       return
@@ -40,12 +42,12 @@ export function AppFilePanel({ open, project, onClose }: AppFilePanelProps) {
       setResult({
         ok: false,
         rootPath: project.path,
-        message: error instanceof Error ? error.message : '无法读取文件树',
+        message: error instanceof Error ? error.message : t('filePanel.loadFailed'),
       })
     } finally {
       if (loadRequestRef.current === requestId) setLoading(false)
     }
-  }, [project.path])
+  }, [project.path, t])
 
   useEffect(() => {
     if (!open) return
@@ -79,27 +81,27 @@ export function AppFilePanel({ open, project, onClose }: AppFilePanelProps) {
     <aside
       className={`app-file-panel${open ? ' is-open' : ''}`}
       id="app-file-panel"
-      aria-label="当前项目文件树"
+      aria-label={t('filePanel.aria')}
       aria-hidden={!open}
       inert={open ? undefined : true}
     >
       <div className="app-file-panel-header">
         <div className="app-file-panel-heading">
           <IconInline name="files" />
-          <span>文件</span>
+          <span>{t('filePanel.heading')}</span>
         </div>
         <div className="app-file-panel-actions">
           <button
             type="button"
             className="btn btn-toolbar"
-            title="刷新文件树"
-            aria-label="刷新文件树"
+            title={t('filePanel.refreshTitle')}
+            aria-label={t('filePanel.refreshAria')}
             disabled={loading}
             onClick={() => void loadProjectFiles()}
           >
             <IconInline name="refresh" />
           </button>
-          <button type="button" className="btn btn-toolbar" title="关闭文件树" aria-label="关闭文件树" onClick={onClose}>
+          <button type="button" className="btn btn-toolbar" title={t('filePanel.closeTitle')} aria-label={t('filePanel.closeAria')} onClick={onClose}>
             <IconInline name="x" />
           </button>
         </div>
@@ -109,23 +111,27 @@ export function AppFilePanel({ open, project, onClose }: AppFilePanelProps) {
         <span className="app-file-panel-project-name" title={result?.rootPath ?? project.path}>
           {result?.ok ? result.rootName : project.name}
         </span>
-        {summary ? <span className="app-file-panel-count">{summary.directories} 目录 / {summary.files} 文件</span> : null}
+        {summary ? (
+          <span className="app-file-panel-count">
+            {t('filePanel.countSummary', { dirs: summary.directories, files: summary.files })}
+          </span>
+        ) : null}
       </div>
 
       <div className="app-file-panel-body">
-        {loading && !result ? <div className="app-file-panel-state">正在读取文件树...</div> : null}
+        {loading && !result ? <div className="app-file-panel-state">{t('filePanel.loading')}</div> : null}
         {result && !result.ok ? (
           <div className="app-file-panel-state" role="status">
             {result.message}
           </div>
         ) : null}
-        {result?.ok && result.nodes.length === 0 ? <div className="app-file-panel-state">没有可显示的文件</div> : null}
+        {result?.ok && result.nodes.length === 0 ? <div className="app-file-panel-state">{t('filePanel.empty')}</div> : null}
         {result?.ok && result.nodes.length > 0 ? (
           <>
-            <div className="app-file-tree" role="tree" aria-label={`${result.rootName} 文件树`}>
+            <div className="app-file-tree" role="tree" aria-label={t('filePanel.treeAria', { name: result.rootName })}>
               <FileTreeRows nodes={result.nodes} expandedPaths={expandedPaths} onToggle={toggleExpanded} />
             </div>
-            {result.truncated ? <div className="app-file-panel-state is-subtle">文件较多，已显示前 1200 项</div> : null}
+            {result.truncated ? <div className="app-file-panel-state is-subtle">{t('filePanel.truncated')}</div> : null}
           </>
         ) : null}
       </div>

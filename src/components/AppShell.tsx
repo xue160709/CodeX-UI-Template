@@ -10,11 +10,12 @@ import {
   SIDEBAR_PROJECT_SKILLS_STORAGE_KEY,
   SIDEBAR_WIDTH_STORAGE_KEY,
   SIDEBAR_MAX_RATIO,
-  VIEW_HEADINGS,
+  VIEW_HEADING_KEYS,
   settingsCategoryFromLocation,
-  settingsWorkspaceTitle,
+  settingsWorkspaceTitleKey,
   viewFromLocation,
 } from './app-shell-constants.ts'
+import { defaultThreadTitleSet, getInitialLocale, translate, useI18n } from '../i18n/i18n'
 import type {
   AppViewId,
   ChatState,
@@ -29,12 +30,13 @@ import { AppShellWorkspace } from './AppShellWorkspace'
 import { type ChatPageHandle } from './ChatPage'
 
 export function AppShell() {
+  const { t } = useI18n()
   const [activeViewId, setActiveViewId] = useState<AppViewId>(() => viewFromLocation())
   const [settingsCategory, setSettingsCategory] = useState<SettingsCategoryId>(() => settingsCategoryFromLocation())
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [canBack, setCanBack] = useState(false)
   const [canForward, setCanForward] = useState(false)
-  const [headerStatus, setHeaderStatus] = useState('Claude Agent')
+  const [headerStatus, setHeaderStatus] = useState(() => translate(getInitialLocale(), 'shell.headerDefault'))
   const [chatWorkspace, setChatWorkspace] = useState<ChatWorkspaceState | null>(null)
   const [showProjectSkillsInSidebar, setShowProjectSkillsInSidebar] = useState(() =>
     readStoredBoolean(SIDEBAR_PROJECT_SKILLS_STORAGE_KEY, false),
@@ -118,7 +120,7 @@ export function AppShell() {
           loading: false,
           loaded: true,
           skills: [],
-          message: '当前运行环境无法读取项目 skills',
+          message: t('shell.projectSkillUnavailable'),
         },
       }))
     }
@@ -167,7 +169,7 @@ export function AppShell() {
               loading: false,
               loaded: true,
               skills: [],
-              message: error instanceof Error ? error.message : '无法读取项目 skills',
+              message: error instanceof Error ? error.message : t('shell.projectSkillReadError'),
             },
           }))
         })
@@ -176,7 +178,7 @@ export function AppShell() {
     return () => {
       cancelled = true
     }
-  }, [projectSkillProjectKey, showProjectSkillsInSidebar])
+  }, [projectSkillProjectKey, showProjectSkillsInSidebar, t])
 
   useEffect(() => {
     if (!chatWorkspace) return
@@ -237,7 +239,7 @@ export function AppShell() {
         const nextThread: WorkspaceThread = {
           id: threadId,
           projectId: targetProjectId,
-          title: '新对话',
+          title: t('thread.newThreadTitle'),
           createdAt: now,
           updatedAt: now,
           chatState: createEmptyChatState(),
@@ -255,7 +257,7 @@ export function AppShell() {
       requestAnimationFrame(() => void chatRef.current?.focusComposer())
       return threadId
     },
-    [goHome, updateChatWorkspace],
+    [goHome, updateChatWorkspace, t],
   )
 
   const runProjectSkill = useCallback((projectId: string, prompt: string) => {
@@ -265,9 +267,9 @@ export function AppShell() {
       return
     }
     void submit.then((submitted) => {
-      if (!submitted) setHeaderStatus('当前对话处理中')
+      if (!submitted) setHeaderStatus(t('shell.headerProcessingThread'))
     })
-  }, [createThreadInProject])
+  }, [createThreadInProject, t])
 
   const selectProject = useCallback(
     (projectId: string) => {
@@ -295,7 +297,7 @@ export function AppShell() {
             {
               id: fallbackThreadId,
               projectId,
-              title: '新对话',
+              title: t('thread.newThreadTitle'),
               createdAt: now,
               updatedAt: now,
               chatState: createEmptyChatState(),
@@ -307,25 +309,26 @@ export function AppShell() {
       if (createdThreadId) void window.claudeChat?.newThread(createdThreadId)
       goHome()
     },
-    [goHome, updateChatWorkspace],
+    [goHome, updateChatWorkspace, t],
   )
 
   const createProject = useCallback(
     async (mode: 'scratch' | 'existing') => {
       let value: string | undefined
       if (mode === 'scratch') {
-        value = window.prompt('新项目名称', 'Untitled Project')?.trim()
+        value = window.prompt(t('project.promptNewName'), t('project.scratchDefaultName'))?.trim()
       } else if (window.desktop?.pickProjectDirectory) {
         value = (await window.desktop.pickProjectDirectory())?.trim()
       } else {
-        value = window.prompt('输入已有文件夹路径', '')?.trim()
+        value = window.prompt(t('project.promptExistingPath'), '')?.trim()
       }
       if (!value) return
 
       const now = Date.now()
       const projectId = createId('project')
       const threadId = createId('thread')
-      const name = mode === 'existing' ? pathBasename(value) : value
+      const scratchDefault = t('project.scratchDefaultName')
+      const name = mode === 'existing' ? pathBasename(value, scratchDefault) : value
       const project: WorkspaceProject = {
         id: projectId,
         name,
@@ -336,7 +339,7 @@ export function AppShell() {
       const thread: WorkspaceThread = {
         id: threadId,
         projectId,
-        title: '新对话',
+        title: t('thread.newThreadTitle'),
         createdAt: now,
         updatedAt: now,
         chatState: createEmptyChatState(),
@@ -353,7 +356,7 @@ export function AppShell() {
       goHome()
       requestAnimationFrame(() => void chatRef.current?.focusComposer())
     },
-    [goHome, updateChatWorkspace],
+    [goHome, updateChatWorkspace, t],
   )
 
   const archiveThread = useCallback(
@@ -397,7 +400,7 @@ export function AppShell() {
             {
               id: newThreadId,
               projectId: target.projectId,
-              title: '新对话',
+              title: t('thread.newThreadTitle'),
               createdAt: now,
               updatedAt: now,
               chatState: createEmptyChatState(),
@@ -409,7 +412,7 @@ export function AppShell() {
       if (createdThreadId) void window.claudeChat?.newThread(createdThreadId)
       goHome()
     },
-    [goHome, updateChatWorkspace],
+    [goHome, updateChatWorkspace, t],
   )
 
   const toggleThreadPinned = useCallback((threadId: string) => {
@@ -427,16 +430,16 @@ export function AppShell() {
       ...prev,
       threads: prev.threads.map((thread) => {
         if (thread.id !== threadId) return thread
-        const isUntitled = thread.title === '新对话'
+        const isUntitled = defaultThreadTitleSet.has(thread.title)
         const hasExistingMessages = thread.chatState.items.some((item) => item.type === 'message' && item.role === 'user')
         return {
           ...thread,
-          title: isUntitled && !hasExistingMessages ? titleFromPrompt(prompt) : thread.title,
+          title: isUntitled && !hasExistingMessages ? titleFromPrompt(prompt, t('thread.newThreadTitle')) : thread.title,
           updatedAt: Date.now(),
         }
       }),
     }))
-  }, [updateChatWorkspace])
+  }, [updateChatWorkspace, t])
 
   const readCssPxVar = useCallback((name: string, fallback: number): number => {
     const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -554,8 +557,10 @@ export function AppShell() {
     }
   }
 
-  const workspaceTitle =
-    activeViewId === 'settings' ? settingsWorkspaceTitle(settingsCategory) : VIEW_HEADINGS[activeViewId]
+  const workspaceTitle = useMemo(() => {
+    if (activeViewId === 'settings') return t(settingsWorkspaceTitleKey(settingsCategory))
+    return t(VIEW_HEADING_KEYS[activeViewId])
+  }, [activeViewId, settingsCategory, t])
 
   if (!chatWorkspace || !activeProject || !activeThread) {
     return null
@@ -625,14 +630,14 @@ function touchProject(projects: WorkspaceProject[], projectId: string, time = Da
   return projects.map((project) => (project.id === projectId ? { ...project, updatedAt: time } : project))
 }
 
-function titleFromPrompt(prompt: string): string {
-  const firstLine = prompt.trim().split(/\n/)[0]?.trim() || '新对话'
+function titleFromPrompt(prompt: string, fallbackTitle: string): string {
+  const firstLine = prompt.trim().split(/\n/)[0]?.trim() || fallbackTitle
   return firstLine.length > 34 ? `${firstLine.slice(0, 34)}...` : firstLine
 }
 
-function pathBasename(path: string): string {
+function pathBasename(path: string, fallback: string): string {
   const parts = path.replace(/[\\/]+$/, '').split(/[\\/]/).filter(Boolean)
-  return parts[parts.length - 1] || path || 'Untitled Project'
+  return parts[parts.length - 1] || path || fallback
 }
 
 function readStoredBoolean(key: string, fallback: boolean): boolean {

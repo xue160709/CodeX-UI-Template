@@ -1,5 +1,7 @@
 import { useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 import { IconInline } from '../icon-inline'
+import type { AppLocale } from '../i18n/i18n'
+import { useI18n } from '../i18n/i18n'
 import type { AppViewId, ProjectSkillListState, SettingsCategoryId, WorkspaceProject, WorkspaceThread } from './types'
 import { SETTINGS_SIDEBAR_NAV } from './app-shell-constants.ts'
 
@@ -50,6 +52,7 @@ export function AppShellSidebar({
   splitterRef,
   onSplitterPointerDown,
 }: AppShellSidebarProps) {
+  const { locale, t } = useI18n()
   const isSettingsSidebar = activeViewId === 'settings'
   const [confirmingArchiveThreadId, setConfirmingArchiveThreadId] = useState<string | null>(null)
 
@@ -82,13 +85,13 @@ export function AppShellSidebar({
 
   return (
     <>
-      <div className="app-chrome-toolbar no-drag" aria-label="窗口导航">
+      <div className="app-chrome-toolbar no-drag" aria-label={t('sidebar.windowNav')}>
         <button
           type="button"
           className="btn btn-toolbar"
           id="btn-toggle-sidebar"
-          title="切换侧栏"
-          aria-label="切换侧栏"
+          title={t('sidebar.toggleSidebar')}
+          aria-label={t('sidebar.toggleSidebar')}
           onClick={onToggleCollapsed}
         >
           <IconInline name="sidebar" />
@@ -97,8 +100,8 @@ export function AppShellSidebar({
           type="button"
           className="btn btn-toolbar"
           id="btn-back"
-          title="后退"
-          aria-label="后退"
+          title={t('sidebar.back')}
+          aria-label={t('sidebar.back')}
           disabled={!canBack}
           onClick={() => window.history.back()}
         >
@@ -108,8 +111,8 @@ export function AppShellSidebar({
           type="button"
           className="btn btn-toolbar"
           id="btn-forward"
-          title="前进"
-          aria-label="前进"
+          title={t('sidebar.forward')}
+          aria-label={t('sidebar.forward')}
           disabled={!canForward}
           onClick={() => window.history.forward()}
         >
@@ -118,7 +121,7 @@ export function AppShellSidebar({
       </div>
       <aside
         className={`app-sidebar${isSettingsSidebar ? ' is-settings-mode' : ''}`}
-        aria-label={isSettingsSidebar ? '设置导航' : '侧栏导航'}
+        aria-label={isSettingsSidebar ? t('sidebar.settingsNav') : t('sidebar.appNav')}
         ref={sidebarRef}
       >
         <div className="app-sidebar-scroll">
@@ -127,15 +130,15 @@ export function AppShellSidebar({
               <>
                 <button type="button" className="app-sidebar-new-thread" id="btn-settings-back-app" onClick={goLeaveSettings}>
                   <IconInline name="back" />
-                  <span>返回应用</span>
+                  <span>{t('sidebar.backToApp')}</span>
                 </button>
-                <div className="app-sidebar-section-label">设置</div>
+                <div className="app-sidebar-section-label">{t('sidebar.settingsSection')}</div>
                 {SETTINGS_SIDEBAR_NAV.map((item) => (
                   <button
                     key={item.id}
                     type="button"
                     disabled={item.disabled}
-                    title={item.disabled ? '尚未实现' : undefined}
+                    title={item.disabled ? t('sidebar.notImplemented') : undefined}
                     className={`app-nav-item${settingsCategory === item.id ? ' is-active' : ''}`}
                     data-settings-category={item.id}
                     onClick={() => {
@@ -146,7 +149,7 @@ export function AppShellSidebar({
                     }}
                   >
                     <IconInline name={item.icon} />
-                    <span>{item.label}</span>
+                    <span>{t(item.labelKey)}</span>
                   </button>
                 ))}
               </>
@@ -154,9 +157,9 @@ export function AppShellSidebar({
               <>
                 <button type="button" className="app-sidebar-new-thread" id="btn-sidebar-new-thread" onClick={onNewThread}>
                   <IconInline name="plus" />
-                  <span>新对话</span>
+                  <span>{t('sidebar.newThread')}</span>
                 </button>
-                <div className="app-sidebar-section-label">项目</div>
+                <div className="app-sidebar-section-label">{t('sidebar.projectsSection')}</div>
                 <div className="app-project-list">
                   {projects.map((project) => {
                     const projectThreads = threadsByProject.get(project.id) ?? []
@@ -185,8 +188,8 @@ export function AppShellSidebar({
                           <button
                             type="button"
                             className="app-project-new-thread"
-                            title="在此项目中新建对话"
-                            aria-label={`在 ${project.name} 中新建对话`}
+                            title={t('sidebar.newThreadInProject')}
+                            aria-label={t('sidebar.newThreadInProjectAria', { name: project.name })}
                             onClick={(event) => {
                               event.stopPropagation()
                               setConfirmingArchiveThreadId(null)
@@ -199,11 +202,11 @@ export function AppShellSidebar({
                         {showProjectSkills && showSkillsSection ? (
                           <div className="app-project-skill-block" aria-label={`${project.name} Skills`}>
                             <div className="app-sidebar-divider">
-                              <span>Skills</span>
+                              <span>{t('sidebar.skillsDivider')}</span>
                             </div>
                             <div className="app-skill-list">
                               {projectSkillState?.loading ? (
-                                <div className="app-skill-empty">扫描中</div>
+                                <div className="app-skill-empty">{t('sidebar.scanning')}</div>
                               ) : (
                                 projectSkills.map((skill) => (
                                   <button
@@ -226,14 +229,15 @@ export function AppShellSidebar({
                         ) : null}
                         {showProjectSkills && showThreadHistoryDivider ? (
                           <div className="app-sidebar-divider app-sidebar-divider--threads">
-                            <span>对话历史</span>
+                            <span>{t('sidebar.threadHistory')}</span>
                           </div>
                         ) : null}
-                        <div className="app-thread-list" aria-label={`${project.name} 对话`}>
+                        <div className="app-thread-list" aria-label={t('sidebar.threadsForProjectAria', { name: project.name })}>
                           {projectThreads.map((thread) => {
                             const isThreadActive = activeThreadId === thread.id
                             const isConfirming = confirmingArchiveThreadId === thread.id
                             const isPinned = Boolean(thread.pinnedAt)
+                            const timeLabel = formatThreadTime(thread.updatedAt, locale, t)
                             return (
                               <div
                                 key={thread.id}
@@ -242,8 +246,12 @@ export function AppShellSidebar({
                                 <button
                                   type="button"
                                   className={`app-thread-pin${isPinned ? ' is-pinned' : ''}`}
-                                  title={isPinned ? '取消置顶' : '置顶'}
-                                  aria-label={isPinned ? `取消置顶 ${thread.title}` : `置顶 ${thread.title}`}
+                                  title={isPinned ? t('sidebar.unpin') : t('sidebar.pin')}
+                                  aria-label={
+                                    isPinned
+                                      ? t('sidebar.unpinThreadAria', { title: thread.title })
+                                      : t('sidebar.pinThreadAria', { title: thread.title })
+                                  }
                                   aria-pressed={isPinned}
                                   onClick={(event) => {
                                     event.stopPropagation()
@@ -265,20 +273,24 @@ export function AppShellSidebar({
                                   <span className="app-thread-title">{thread.title}</span>
                                 </button>
                                 <div className="app-thread-trailing">
-                                  <span className="app-thread-time" aria-label={`最后聊天时间 ${formatThreadTime(thread.updatedAt)}`}>
-                                    {formatThreadTime(thread.updatedAt)}
+                                  <span className="app-thread-time" aria-label={t('sidebar.lastChatAria', { time: timeLabel })}>
+                                    {timeLabel}
                                   </span>
                                   <button
                                     type="button"
                                     className={`app-thread-archive${isConfirming ? ' is-confirming' : ''}`}
-                                    title={isConfirming ? '确认归档' : '归档'}
-                                    aria-label={isConfirming ? `确认归档 ${thread.title}` : `归档 ${thread.title}`}
+                                    title={isConfirming ? t('sidebar.confirmArchive') : t('sidebar.archive')}
+                                    aria-label={
+                                      isConfirming
+                                        ? t('sidebar.confirmArchiveAria', { title: thread.title })
+                                        : t('sidebar.archiveAria', { title: thread.title })
+                                    }
                                     onClick={(event) => {
                                       event.stopPropagation()
                                       requestArchive(thread.id)
                                     }}
                                   >
-                                    {isConfirming ? <span>确认</span> : <IconInline name="trash" />}
+                                    {isConfirming ? <span>{t('sidebar.confirm')}</span> : <IconInline name="trash" />}
                                   </button>
                                 </div>
                               </div>
@@ -294,19 +306,19 @@ export function AppShellSidebar({
           </div>
         </div>
         {!isSettingsSidebar && (
-          <footer className="app-sidebar-footer">           
-              <button
-                type="button"
-                className="btn btn-toolbar"
-                id="btn-footer-settings"
-                title="设置"
-                aria-label="设置"
-                onClick={() => {
-                  window.location.hash = 'settings/general'
-                }}
-              >
-                <IconInline name="settings" />
-              </button>
+          <footer className="app-sidebar-footer">
+            <button
+              type="button"
+              className="btn btn-toolbar"
+              id="btn-footer-settings"
+              title={t('sidebar.settings')}
+              aria-label={t('sidebar.settings')}
+              onClick={() => {
+                window.location.hash = 'settings/general'
+              }}
+            >
+              <IconInline name="settings" />
+            </button>
           </footer>
         )}
       </aside>
@@ -316,18 +328,17 @@ export function AppShellSidebar({
         ref={splitterRef}
         role="separator"
         aria-orientation="vertical"
-        aria-label="调整侧栏宽度"
+        aria-label={t('sidebar.resizeSidebar')}
         onPointerDown={onSplitterPointerDown}
       />
     </>
   )
 }
 
-function formatThreadTime(timestamp: number): string {
+function formatThreadTime(timestamp: number, locale: AppLocale, t: (path: string, vars?: Record<string, string | number>) => string): string {
   const diff = Date.now() - timestamp
-  if (diff < 60_000) return '刚刚'
-  if (diff < 3_600_000) return `${Math.max(1, Math.floor(diff / 60_000))} 分`
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时`
-  return new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(timestamp)
+  if (diff < 60_000) return t('sidebar.justNow')
+  if (diff < 3_600_000) return t('sidebar.minutesShort', { n: Math.max(1, Math.floor(diff / 60_000)) })
+  if (diff < 86_400_000) return t('sidebar.hoursShort', { n: Math.floor(diff / 3_600_000) })
+  return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', { month: 'numeric', day: 'numeric' }).format(timestamp)
 }
-

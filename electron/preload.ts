@@ -33,6 +33,9 @@ contextBridge.exposeInMainWorld('desktop', {
   saveChatWorkspace(state: unknown) {
     return ipcRenderer.invoke('chat-workspace:save', state)
   },
+  quitApp() {
+    return ipcRenderer.invoke('desktop:quit') as Promise<void>
+  },
 })
 
 contextBridge.exposeInMainWorld('ipcRenderer', {

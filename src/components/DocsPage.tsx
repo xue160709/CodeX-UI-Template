@@ -1,13 +1,16 @@
+import { useI18n } from '../i18n/i18n'
+
 type DocsPageProps = { hidden: boolean }
 
 export function DocsPage({ hidden }: DocsPageProps) {
+  const { t } = useI18n()
   return (
     <section className="app-main-inner" id="panel-docs" hidden={hidden} aria-hidden={hidden}>
-      <div className="app-main-eyebrow">文档</div>
-      <h1 className="app-main-heading">文档</h1>
+      <div className="app-main-eyebrow">{t('docs.eyebrow')}</div>
+      <h1 className="app-main-heading">{t('docs.heading')}</h1>
       <section className="app-panel">
         <p className="text-token-secondary" style={{ margin: 0 }}>
-          文档视图占位。可在此接入路由或 Webview。
+          {t('docs.placeholder')}
         </p>
       </section>
     </section>

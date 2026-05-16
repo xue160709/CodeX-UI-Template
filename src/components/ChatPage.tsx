@@ -25,6 +25,7 @@ import type {
   ProjectFileSearchItem,
 } from '../claude-chat-types'
 import { IconInline } from '../icon-inline'
+import { useI18n } from '../i18n/i18n'
 import type {
   ActivityStatus,
   ChatActivityItem,
@@ -127,29 +128,31 @@ type BuiltInSlashCommand = {
   argumentHint: string
 }
 
-const BUILT_IN_SLASH_COMMANDS: BuiltInSlashCommand[] = [
-  {
-    kind: 'built-in',
-    command: 'compact',
-    title: '/compact',
-    description: '压缩当前会话上下文，保留后续继续工作需要的信息。',
-    argumentHint: '[instructions]',
-  },
-  {
-    kind: 'built-in',
-    command: 'status',
-    title: '/status',
-    description: '查看当前会话、模型、工具和上下文状态。',
-    argumentHint: '',
-  },
-  {
-    kind: 'built-in',
-    command: 'help',
-    title: '/help',
-    description: '查看 Claude Agent 可用的会话命令。',
-    argumentHint: '',
-  },
-]
+function getBuiltInSlashCommands(t: (path: string, vars?: Record<string, string | number>) => string): BuiltInSlashCommand[] {
+  return [
+    {
+      kind: 'built-in',
+      command: 'compact',
+      title: t('chat.slashCompactTitle'),
+      description: t('chat.slashCompactDesc'),
+      argumentHint: '[instructions]',
+    },
+    {
+      kind: 'built-in',
+      command: 'status',
+      title: t('chat.slashStatusTitle'),
+      description: t('chat.slashStatusDesc'),
+      argumentHint: '',
+    },
+    {
+      kind: 'built-in',
+      command: 'help',
+      title: t('chat.slashHelpTitle'),
+      description: t('chat.slashHelpDesc'),
+      argumentHint: '',
+    },
+  ]
+}
 
 function ChatMessage({ item }: { item: ChatMessageItem }) {
   const bodyHtml = useMemo(() => {
@@ -174,11 +177,12 @@ function ChatMessage({ item }: { item: ChatMessageItem }) {
 }
 
 function ToolRow({ item }: { item: ChatToolItem }) {
+  const { t } = useI18n()
   const statusLabel: Record<ToolStatus, string> = {
-    denied: '已拒绝',
-    done: '已完成',
-    error: '出错',
-    running: '运行中',
+    denied: t('chat.toolDenied'),
+    done: t('chat.toolDone'),
+    error: t('chat.toolError'),
+    running: t('chat.toolRunning'),
   }
   const hasDetails = Boolean(item.detail || item.inputPreview)
   const [isOpen, setIsOpen] = useState(item.status === 'running')
@@ -210,6 +214,7 @@ function ToolRow({ item }: { item: ChatToolItem }) {
 }
 
 function ThinkingRow({ item }: { item: ChatThinkingItem }) {
+  const { t } = useI18n()
   const [isOpen, setIsOpen] = useState(item.status === 'running')
 
   useEffect(() => {
@@ -226,7 +231,7 @@ function ThinkingRow({ item }: { item: ChatThinkingItem }) {
         <span className="status-row__chevron" aria-hidden="true" />
         <span className="thinking-row__dot" />
         <span className="thinking-row__title">{item.title}</span>
-        <span className="thinking-row__status">{item.status === 'running' ? '思考中' : '完成'}</span>
+        <span className="thinking-row__status">{item.status === 'running' ? t('chat.thinkingRunning') : t('chat.thinkingDone')}</span>
       </summary>
       {item.content ? <pre>{item.content}</pre> : null}
     </details>
@@ -234,11 +239,12 @@ function ThinkingRow({ item }: { item: ChatThinkingItem }) {
 }
 
 function ActivityRow({ item }: { item: ChatActivityItem }) {
+  const { t } = useI18n()
   const statusLabel: Record<ActivityStatus, string> = {
-    done: '完成',
-    error: '出错',
-    info: '状态',
-    running: '进行中',
+    done: t('chat.activityDone'),
+    error: t('chat.activityError'),
+    info: t('chat.activityInfo'),
+    running: t('chat.activityRunning'),
   }
   const [isOpen, setIsOpen] = useState(item.status === 'running')
 
@@ -279,6 +285,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
   },
   ref,
 ) {
+  const { t } = useI18n()
   const chatState = activeThread.chatState
   const [isRunning, setIsRunning] = useState(false)
   const [inputValue, setInputValue] = useState('')
@@ -377,18 +384,24 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
   const applyGlobalModelFromSettings = useCallback(
     (snapshot: ClaudeAgentSettingsSnapshot) => {
       const settings = snapshot.settings
+      const slots = {
+        primary: t('chat.modelSlotPrimary'),
+        haiku: t('chat.modelSlotHaiku'),
+        sonnet: t('chat.modelSlotSonnet'),
+        opus: t('chat.modelSlotOpus'),
+      }
 
-      setModelMenuRows(buildChatModelMenuRows(settings.providers))
-      setModelMenuSelectionKey(pickerSelectionKeyFromSettings(settings))
+      setModelMenuRows(buildChatModelMenuRows(settings.providers, slots, t))
+      setModelMenuSelectionKey(pickerSelectionKeyFromSettings(settings, t))
 
-      const model = resolvedChatDisplayModel(settings)
+      const model = resolvedChatDisplayModel(settings, t)
       setGlobalDisplayModel(model)
 
       if (!isRunningRef.current) {
-        onStatusChange(compactModelName(model))
+        onStatusChange(compactModelName(model, t))
       }
     },
-    [onStatusChange],
+    [onStatusChange, t],
   )
 
   useEffect(() => {
@@ -424,8 +437,8 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     ? `${activeComposerTrigger.kind}:${activeComposerTrigger.start}:${activeComposerTrigger.query}`
     : ''
   const composerSuggestions = useMemo(
-    () => buildComposerSuggestions(activeComposerTrigger, agentContext, fileMentionResults),
-    [activeComposerTrigger, agentContext, fileMentionResults],
+    () => buildComposerSuggestions(activeComposerTrigger, agentContext, fileMentionResults, t),
+    [activeComposerTrigger, agentContext, fileMentionResults, t],
   )
   const composerAutocompleteOpen =
     Boolean(activeComposerTrigger) &&
@@ -932,7 +945,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
             return { ...prev, sessionId: event.sessionId, items }
           })
         })
-        finishRequest(event.requestId, compactModelName(globalDisplayModelRef.current))
+        finishRequest(event.requestId, compactModelName(globalDisplayModelRef.current, t))
         return
       }
 
@@ -965,7 +978,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
             return { ...prev, items: itemsOut }
           })
         })
-        finishRequest(event.requestId, event.code === 'missing_api_key' ? '缺少 API Key' : '出错')
+        finishRequest(event.requestId, event.code === 'missing_api_key' ? t('chat.missingApiKey') : t('chat.errorGeneric'))
         return
       }
 
@@ -980,7 +993,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
               if (item.type !== 'message' || item.role !== 'assistant') return item
               if (item.id !== expectedId && item.id !== pendingId) return item
               found = true
-              const content = !item.content.trim() ? '已停止。' : item.content
+              const content = !item.content.trim() ? t('chat.stoppedBody') : item.content
               return { ...item, content, status: 'cancelled' }
             })
             const items: TranscriptItem[] = found
@@ -991,17 +1004,17 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                     type: 'message',
                     id: expectedId,
                     role: 'assistant',
-                    content: '已停止。',
+                    content: t('chat.stoppedBody'),
                     status: 'cancelled',
                   },
                 ]
             return { ...prev, items }
           })
         })
-        finishRequest(event.requestId, '已停止')
+        finishRequest(event.requestId, t('chat.stoppedStatus'))
       }
     },
-    [finishRequest, onStatusChange, setThreadChatState],
+    [finishRequest, onStatusChange, setThreadChatState, t],
   )
 
   useEffect(() => {
@@ -1036,7 +1049,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     setIsRunning(true)
     isRunningRef.current = true
     activeAssistantMessageIdRef.current = undefined
-    onStatusChange('处理中')
+    onStatusChange(t('chat.statusProcessing'))
 
     if (!window.claudeChat) {
       scrollIntentRef.current = 'force-bottom'
@@ -1048,7 +1061,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
             type: 'message',
             id: `assistant-error-${Date.now()}`,
             role: 'assistant',
-            content: 'Claude bridge unavailable. 请在 Electron 环境中运行应用。',
+            content: t('chat.bridgeErrorBody'),
             status: 'error',
           },
         ],
@@ -1056,7 +1069,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       setIsRunning(false)
       isRunningRef.current = false
       activeAssistantMessageIdRef.current = undefined
-      onStatusChange('桥接不可用')
+      onStatusChange(t('chat.bridgeUnavailableStatus'))
       return
     }
 
@@ -1088,7 +1101,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       isRunningRef.current = false
       activeRequestIdRef.current = undefined
       activeAssistantMessageIdRef.current = undefined
-      onStatusChange('发送失败')
+      onStatusChange(t('chat.sendFailedStatus'))
     }
   }
 
@@ -1103,7 +1116,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         activeAssistantMessageIdRef.current = undefined
         isRunningRef.current = false
         setIsRunning(false)
-        onStatusChange(compactModelName(globalDisplayModelRef.current))
+        onStatusChange(compactModelName(globalDisplayModelRef.current, t))
         setInputValue('')
         requestAnimationFrame(() => chatInputRef.current?.focus())
       },
@@ -1125,7 +1138,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         return true
       },
     }),
-    [onNewThread, onStatusChange, projects],
+    [onNewThread, onStatusChange, projects, t],
   )
 
   const cancelActiveRequest = async () => {
@@ -1206,12 +1219,12 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     <section
       className={`chat-page${hasMessages ? ' has-messages' : ''}`}
       id="panel-home"
-      aria-label="Claude Agent 聊天"
+      aria-label={t('chat.ariaPage')}
       hidden={hidden}
       aria-hidden={hidden}
     >
       <div className="chat-empty-header" id="chat-empty-header" hidden={hasMessages}>
-        <h1>我们该构建什么？</h1>
+        <h1>{t('chat.emptyHeading')}</h1>
       </div>
       <div className="chat-scroll-region" id="chat-scroll-region" ref={scrollRegionRef} hidden={!hasMessages}>
         <div className="chat-transcript" id="chat-transcript" aria-live="polite">
@@ -1227,8 +1240,8 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         type="button"
         className="btn btn-scroll-bottom"
         id="btn-scroll-bottom"
-        title="滚动到底部"
-        aria-label="滚动到底部"
+        title={t('chat.scrollBottomTitle')}
+        aria-label={t('chat.scrollBottomAria')}
         hidden={!hasMessages}
         aria-hidden={!showScrollButton}
         tabIndex={showScrollButton ? 0 : -1}
@@ -1244,7 +1257,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
             className="chat-input"
             id="chat-input"
             rows={1}
-            placeholder="要求后续变更"
+            placeholder={t('chat.composerPlaceholder')}
             autoComplete="off"
             spellCheck={false}
             value={inputValue}
@@ -1266,7 +1279,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                   ref={composerAutocompleteSurfaceRef}
                   className="composer-autocomplete-popover"
                   role="listbox"
-                  aria-label={activeComposerTrigger?.kind === 'slash' ? 'Slash commands' : 'Mentions'}
+                  aria-label={activeComposerTrigger?.kind === 'slash' ? t('chat.autocompleteSlashAria') : t('chat.autocompleteMentionAria')}
                   style={{
                     position: 'fixed',
                     left: composerAutocompleteBox.left,
@@ -1318,8 +1331,8 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                   type="button"
                   className={`composer-model-button${modelPickerOpen ? ' is-open' : ''}`}
                   id="composer-model-trigger"
-                  title="选择对话使用的模型配置"
-                  aria-label="选择对话使用的模型配置"
+                  title={t('chat.modelPickerTitle')}
+                  aria-label={t('chat.modelPickerAria')}
                   aria-expanded={modelPickerOpen}
                   aria-haspopup="menu"
                   disabled={isRunning || modelMenuRows.length === 0}
@@ -1328,7 +1341,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                     setModelPickerOpen((open) => !open)
                   }}
                 >
-                  <span id="composer-model">{compactModelName(globalDisplayModel)}</span>
+                  <span id="composer-model">{compactModelName(globalDisplayModel, t)}</span>
                   <IconInline name="chevron" />
                 </button>
                 {modelPickerOpen && modelMenuRows.length > 0 && modelPopoverBox
@@ -1337,7 +1350,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                         ref={modelPopoverSurfaceRef}
                         className="composer-model-popover"
                         role="menu"
-                        aria-label="模型配置条目"
+                        aria-label={t('chat.modelMenuAria')}
                         style={{
                           position: 'fixed',
                           left: modelPopoverBox.left,
@@ -1377,8 +1390,8 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                 type="submit"
                 className="composer-send-button"
                 id="btn-send"
-                title={isRunning ? '停止' : '发送'}
-                aria-label={isRunning ? '停止' : '发送'}
+                title={isRunning ? t('chat.stop') : t('chat.send')}
+                aria-label={isRunning ? t('chat.stop') : t('chat.send')}
                 disabled={!isRunning && !hasSendText}
                 onClick={handleSendClick}
               >
@@ -1388,7 +1401,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
           </div>
         </form>
 
-        <div className="chat-context-strip" aria-label="当前上下文">
+        <div className="chat-context-strip" aria-label={t('chat.contextStripAria')}>
           <div className="chat-project-picker" ref={projectPickerRef}>
             <button
               ref={projectPopoverAnchorRef}
@@ -1396,7 +1409,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
               className={`chat-project-trigger${projectPickerOpen ? ' is-open' : ''}`}
               aria-haspopup="menu"
               aria-expanded={projectPickerOpen}
-              title="切换项目"
+              title={t('chat.switchProject')}
               onClick={() => setProjectPickerOpen((open) => !open)}
             >
               <IconInline name="folder" />
@@ -1409,7 +1422,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                     ref={projectPopoverSurfaceRef}
                     className="chat-project-popover"
                     role="menu"
-                    aria-label="项目"
+                    aria-label={t('chat.projectMenuAria')}
                     style={{
                       position: 'fixed',
                       left: projectPopoverBox.left,
@@ -1418,7 +1431,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                       maxHeight: projectPopoverBox.maxHeight,
                     }}
                   >
-                <div className="chat-project-popover-title">项目</div>
+                <div className="chat-project-popover-title">{t('chat.projectMenuTitle')}</div>
                 <div className="chat-project-options">
                   {projects.map((project) => {
                     const selected = project.id === activeProject.id
@@ -1443,7 +1456,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                     )
                   })}
                 </div>
-                <div className="chat-project-popover-title">新增项目</div>
+                <div className="chat-project-popover-title">{t('chat.addProjectTitle')}</div>
                 <button
                   type="button"
                   role="menuitem"
@@ -1455,8 +1468,8 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                 >
                   <IconInline name="folder" />
                   <span className="chat-project-option-copy">
-                    <span>使用已有文件夹</span>
-                    <span>把文件夹加入项目列表</span>
+                    <span>{t('chat.useExistingFolder')}</span>
+                    <span>{t('chat.useExistingFolderSub')}</span>
                   </span>
                 </button>
                   </div>,
@@ -1467,15 +1480,18 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
           <button
             type="button"
             className="chat-context-action"
-            title="刷新当前项目的 skills / agents"
+            title={t('chat.refreshContextTitle')}
             disabled={agentContextLoading}
             onClick={() => void refreshAgentContext()}
           >
             <IconInline name="chip" />
             <span>
               {agentContextLoading
-                ? '扫描中'
-                : `${agentContext?.skills.length ?? 0} skills / ${agentContext?.agents.length ?? 0} agents`}
+                ? t('chat.scanning')
+                : t('chat.skillsAgentsCount', {
+                    skills: agentContext?.skills.length ?? 0,
+                    agents: agentContext?.agents.length ?? 0,
+                  })}
             </span>
           </button>
         </div>
@@ -1514,19 +1530,20 @@ function buildComposerSuggestions(
   trigger: ComposerTrigger | null,
   catalog: AgentContextCatalog | null,
   fileResults: ProjectFileSearchItem[],
+  t: (path: string, vars?: Record<string, string | number>) => string,
 ): ComposerSuggestion[] {
   if (!trigger) return []
-  if (trigger.kind === 'slash') return buildSlashSuggestions(trigger.query, catalog)
-  return buildMentionSuggestions(trigger.query, catalog, fileResults)
+  if (trigger.kind === 'slash') return buildSlashSuggestions(trigger.query, catalog, t)
+  return buildMentionSuggestions(trigger.query, catalog, fileResults, t)
 }
 
-function buildSlashSuggestions(query: string, catalog: AgentContextCatalog | null): ComposerSuggestion[] {
+function buildSlashSuggestions(query: string, catalog: AgentContextCatalog | null, t: (path: string, vars?: Record<string, string | number>) => string): ComposerSuggestion[] {
   const normalizedQuery = normalizeSuggestionQuery(query)
-  const builtIns: ComposerSuggestion[] = BUILT_IN_SLASH_COMMANDS.map((command) => ({
+  const builtIns: ComposerSuggestion[] = getBuiltInSlashCommands(t).map((command) => ({
     id: `slash-built-in-${command.command}`,
     kind: 'slash',
     title: `${command.title}${command.argumentHint ? ` ${command.argumentHint}` : ''}`,
-    subtitle: `Built-in · ${command.description}`,
+    subtitle: `${t('chat.slashBuiltInPrefix')}${command.description}`,
     insertText: `${command.title} `,
     item: command,
   }))
@@ -1535,7 +1552,7 @@ function buildSlashSuggestions(query: string, catalog: AgentContextCatalog | nul
     id: `slash-${skill.path}`,
     kind: 'slash',
     title: `${skill.title}${skill.argumentHint ? ` ${skill.argumentHint}` : ''}`,
-    subtitle: `${formatContextScope(skill.scope)} · ${formatContextSource(skill.source)} · ${skill.description || skill.relativePath}`,
+    subtitle: `${formatContextScope(skill.scope, t)} · ${formatContextSource(skill.source)} · ${skill.description || skill.relativePath}`,
     insertText: `${skill.title} `,
     item: skill,
   }))
@@ -1552,13 +1569,14 @@ function buildMentionSuggestions(
   query: string,
   catalog: AgentContextCatalog | null,
   fileResults: ProjectFileSearchItem[],
+  t: (path: string, vars?: Record<string, string | number>) => string,
 ): ComposerSuggestion[] {
   const normalizedQuery = normalizeSuggestionQuery(query.replace(/^agent-/, ''))
   const files: ComposerSuggestion[] = fileResults.map((file) => ({
     id: `file-${file.path}`,
     kind: 'file',
     title: file.relativePath,
-    subtitle: file.type === 'directory' ? 'Directory' : 'File',
+    subtitle: file.type === 'directory' ? t('chat.mentionFileTypeDir') : t('chat.mentionFileTypeFile'),
     insertText: `${formatFileMention(file.relativePath)} `,
     item: file,
   }))
@@ -1567,7 +1585,7 @@ function buildMentionSuggestions(
     id: `agent-${agent.path}`,
     kind: 'agent',
     title: `@agent-${agent.name}`,
-    subtitle: `${formatContextScope(agent.scope)} · ${formatContextSource(agent.source)} · ${agent.description || agent.relativePath}`,
+    subtitle: `${formatContextScope(agent.scope, t)} · ${formatContextSource(agent.source)} · ${agent.description || agent.relativePath}`,
     insertText: `@agent-${agent.name} `,
     item: agent,
   }))
@@ -1594,8 +1612,8 @@ function formatFileMention(relativePath: string): string {
   return `@"${relativePath.replace(/"/g, '\\"')}"`
 }
 
-function formatContextScope(scope: 'user' | 'project'): string {
-  return scope === 'user' ? 'User' : 'Project'
+function formatContextScope(scope: 'user' | 'project', t: (path: string, vars?: Record<string, string | number>) => string): string {
+  return scope === 'user' ? t('chat.scopeUser') : t('chat.scopeProject')
 }
 
 function formatContextSource(source: AgentContextSource): string {
@@ -1627,24 +1645,34 @@ function providerAcceptsAnthropicId(provider: ClaudeAgentModelProvider, modelId:
     .includes(m)
 }
 
-function resolvedChatDisplayModel(settings: ClaudeAgentSettings): string {
+function resolvedChatDisplayModel(
+  settings: ClaudeAgentSettings,
+  t: (path: string, vars?: Record<string, string | number>) => string,
+): string {
   const provider =
     settings.providers.find((item) => item.id === settings.activeProviderId) ?? settings.providers[0]
-  if (!provider) return 'Claude Agent'
+  if (!provider) return t('chat.modelFallback')
   const overlay = settings.activeAnthropicModel?.trim() ?? ''
   if (overlay && providerAcceptsAnthropicId(provider, overlay)) return overlay
-  return provider.model.trim() || provider.name.trim() || 'Claude Agent'
+  return provider.model.trim() || provider.name.trim() || t('chat.modelFallback')
 }
 
-function pickerSelectionKeyFromSettings(settings: ClaudeAgentSettings): string {
+function pickerSelectionKeyFromSettings(
+  settings: ClaudeAgentSettings,
+  t: (path: string, vars?: Record<string, string | number>) => string,
+): string {
   const provider =
     settings.providers.find((item) => item.id === settings.activeProviderId) ?? settings.providers[0]
-  const idModel = resolvedChatDisplayModel(settings)
+  const idModel = resolvedChatDisplayModel(settings, t)
   if (!provider) return `:${idModel}`
   return `${provider.id}:${idModel}`
 }
 
-function buildChatModelMenuRows(providers: ClaudeAgentModelProvider[]): ChatModelMenuRow[] {
+function buildChatModelMenuRows(
+  providers: ClaudeAgentModelProvider[],
+  slots: { primary: string; haiku: string; sonnet: string; opus: string },
+  t: (path: string, vars?: Record<string, string | number>) => string,
+): ChatModelMenuRow[] {
   const rows: ChatModelMenuRow[] = []
   for (const p of providers) {
     const seen = new Set<string>()
@@ -1659,15 +1687,15 @@ function buildChatModelMenuRows(providers: ClaudeAgentModelProvider[]): ChatMode
         providerId: p.id,
         anthropicModelId: mid,
         useOverlayPick,
-        headline: compactModelName(mid),
+        headline: compactModelName(mid, t),
         metaLine: [base || null, slotLabel].filter(Boolean).join(' · '),
       })
     }
 
-    add(p.model, '主模型', false)
-    add(p.defaultHaikuModel, 'Haiku', true)
-    add(p.defaultSonnetModel, 'Sonnet', true)
-    add(p.defaultOpusModel, 'Opus', true)
+    add(p.model, slots.primary, false)
+    add(p.defaultHaikuModel, slots.haiku, true)
+    add(p.defaultSonnetModel, slots.sonnet, true)
+    add(p.defaultOpusModel, slots.opus, true)
   }
 
   return rows
@@ -1683,8 +1711,8 @@ function providerMenuSubtitle(entry: ClaudeAgentModelProvider): string {
   return parts.join(' · ')
 }
 
-function compactModelName(model: string): string {
-  if (!/^claude-/i.test(model)) return model || 'Claude Agent'
+function compactModelName(model: string, t: (path: string, vars?: Record<string, string | number>) => string): string {
+  if (!/^claude-/i.test(model)) return model || t('chat.modelFallback')
 
   return model
     .replace(/^claude-/i, '')

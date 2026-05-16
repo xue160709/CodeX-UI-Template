@@ -198,6 +198,9 @@ app.whenReady().then(() => {
   ipcMain.handle('desktop:list-agent-context', (_event, rootPath: string) => {
     return discoverAgentContext(rootPath)
   })
+  ipcMain.handle('desktop:quit', () => {
+    app.quit()
+  })
   createWindow()
 })
 

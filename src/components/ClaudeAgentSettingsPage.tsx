@@ -7,12 +7,14 @@ import type {
   ClaudeAgentSettingsSnapshot,
 } from '../claude-chat-types'
 import { IconInline } from '../icon-inline'
+import { getInitialLocale, translate, useI18n } from '../i18n/i18n'
 
 const SETTINGS_CHANGED_EVENT = 'claude-agent-settings:changed'
 
 type EditableProviderField = Exclude<keyof ClaudeAgentModelProvider, 'id'>
 
 export function ClaudeAgentSettingsPage() {
+  const { t } = useI18n()
   const [configSource, setConfigSource] = useState<ClaudeAgentConfigSource>('settings')
   const [providers, setProviders] = useState<ClaudeAgentModelProvider[]>(() => [createModelProvider()])
   /** 左侧列表：仅决定下方表单在编辑哪一条，与聊天使用的条目无关 */
@@ -21,7 +23,7 @@ export function ClaudeAgentSettingsPage() {
   const [chatActiveProviderId, setChatActiveProviderId] = useState('')
   /** 选中的实际请求模型；空则沿用该条目的默认模型字段 */
   const [chatActiveAnthropicModel, setChatActiveAnthropicModel] = useState('')
-  const [envStatusTags, setEnvStatusTags] = useState(['ENV: 未读取'])
+  const [envStatusTags, setEnvStatusTags] = useState<string[]>(() => [translate(getInitialLocale(), 'settings.models.envNotLoaded')])
   const [status, setStatus] = useState('')
   const [saveDisabled, setSaveDisabled] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -46,28 +48,28 @@ export function ClaudeAgentSettingsPage() {
     setEditingProviderId((prev) =>
       nextProviders.some((provider) => provider.id === prev) ? prev : nextProviders[0].id,
     )
-    setEnvStatusTags(createEnvStatusTags(snapshot))
-  }, [])
+    setEnvStatusTags(createEnvStatusTags(snapshot, t))
+  }, [t])
 
   const load = useCallback(async () => {
     if (!window.claudeChat) {
-      setStatus('Claude bridge 不可用')
+      setStatus(t('settings.models.bridgeUnavailable'))
       setSaveDisabled(true)
       return
     }
-    setStatus('读取中')
+    setStatus(t('settings.models.loading'))
     try {
       applySnapshot(await window.claudeChat.getSettings())
       setSaveDisabled(false)
-      setStatus('已读取')
+      setStatus(t('settings.models.loaded'))
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error))
     }
-  }, [applySnapshot])
+  }, [applySnapshot, t])
 
   const save = useCallback(async () => {
     if (!window.claudeChat) {
-      setStatus('Claude bridge 不可用')
+      setStatus(t('settings.models.bridgeUnavailable'))
       return
     }
     const nextProviders = providers.length ? providers : [createModelProvider()]
@@ -83,18 +85,18 @@ export function ClaudeAgentSettingsPage() {
     }
 
     setBusy(true)
-    setStatus('保存中')
+    setStatus(t('settings.models.saving'))
     try {
       const snapshot = await window.claudeChat.saveSettings(payload)
       applySnapshot(snapshot)
       window.dispatchEvent(new CustomEvent('claude-agent-settings:changed', { detail: snapshot }))
-      setStatus('已保存')
+      setStatus(t('settings.models.saved'))
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error))
     } finally {
       setBusy(false)
     }
-  }, [applySnapshot, chatActiveAnthropicModel, chatActiveProviderId, configSource, providers])
+  }, [applySnapshot, chatActiveAnthropicModel, chatActiveProviderId, configSource, providers, t])
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -105,7 +107,7 @@ export function ClaudeAgentSettingsPage() {
     const provider = createModelProvider()
     setProviders((current) => [...current, provider])
     setEditingProviderId(provider.id)
-    setStatus('已添加模型配置')
+    setStatus(t('settings.models.addedProvider'))
   }
 
   const removeProvider = (providerId: string) => {
@@ -119,7 +121,7 @@ export function ClaudeAgentSettingsPage() {
     if (chatActiveProviderId === providerId) {
       setChatActiveProviderId(nextProviders[0]?.id ?? '')
     }
-    setStatus('已移除模型配置')
+    setStatus(t('settings.models.removedProvider'))
   }
 
   const updateEditingProvider = (field: EditableProviderField, value: string) => {
@@ -149,18 +151,16 @@ export function ClaudeAgentSettingsPage() {
   return (
     <section className="app-main-inner settings-page settings-page--models" id="panel-settings" aria-hidden={false}>
       <header className="settings-page-header">
-        <h1 className="app-main-heading">模型</h1>
-        <p className="settings-lede">
-          配置 Claude Agent 使用的模型厂商、凭据和模型映射。真正用于对话请求的条目仍在聊天输入框旁的模型菜单中切换。
-        </p>
+        <h1 className="app-main-heading">{t('settings.models.pageTitle')}</h1>
+        <p className="settings-lede">{t('settings.models.pageLede')}</p>
       </header>
 
       <form className="settings-stack" id="claude-settings-form" onSubmit={handleSubmit}>
         <section className="settings-section" aria-labelledby="settings-section-source-heading">
           <h2 id="settings-section-source-heading" className="settings-section-heading">
-            配置来源
+            {t('settings.models.configSource')}
           </h2>
-          <div className="settings-segmented" role="radiogroup" aria-label="Claude 配置来源">
+          <div className="settings-segmented" role="radiogroup" aria-label={t('settings.models.configSourceRadiogroup')}>
             <label className={configSource === 'settings' ? 'settings-segment is-selected' : 'settings-segment'}>
               <input
                 type="radio"
@@ -174,13 +174,11 @@ export function ClaudeAgentSettingsPage() {
                 <span className="settings-segment-top">
                   <span className="settings-segment-title">
                     <IconInline name="settings" />
-                    <span>设置优先</span>
+                    <span>{t('settings.models.settingsFirst')}</span>
                   </span>
                   <span className="settings-segment-radio" aria-hidden="true" />
                 </span>
-                <span className="settings-segment-desc">
-                  聊天里选中的条目若在此模式下，其非空字段会覆盖同名环境变量，空字段回退环境值。
-                </span>
+                <span className="settings-segment-desc">{t('settings.models.settingsFirstDesc')}</span>
               </span>
             </label>
             <label className={configSource === 'env' ? 'settings-segment is-selected' : 'settings-segment'}>
@@ -196,11 +194,11 @@ export function ClaudeAgentSettingsPage() {
                 <span className="settings-segment-top">
                   <span className="settings-segment-title">
                     <IconInline name="server" />
-                    <span>仅环境变量</span>
+                    <span>{t('settings.models.envOnly')}</span>
                   </span>
                   <span className="settings-segment-radio" aria-hidden="true" />
                 </span>
-                <span className="settings-segment-desc">只读取 Electron 主进程环境中的 ANTHROPIC_*。</span>
+                <span className="settings-segment-desc">{t('settings.models.envOnlyDesc')}</span>
               </span>
             </label>
           </div>
@@ -209,17 +207,15 @@ export function ClaudeAgentSettingsPage() {
         <section className="settings-section" aria-labelledby="settings-section-providers-heading">
           <div className="settings-section-header">
             <h2 id="settings-section-providers-heading" className="settings-section-heading">
-              模型厂商
+              {t('settings.models.providersHeading')}
             </h2>
             <button type="button" className="btn btn-ghost btn-compact" onClick={addProvider}>
               <IconInline name="plus" />
-              <span>添加</span>
+              <span>{t('settings.models.add')}</span>
             </button>
           </div>
-          <p className="settings-section-caption">
-            点击某行仅打开下方表单进行填写，不会在设置页切换对话模型。Haiku / Sonnet / Opus 映射里填写的标识符都会在聊天模型菜单中出现（同一标识符只展示一行）。
-          </p>
-          <div className="settings-provider-list" role="list" aria-label="模型厂商条目">
+          <p className="settings-section-caption">{t('settings.models.providersCaption')}</p>
+          <div className="settings-provider-list" role="list" aria-label={t('settings.models.providerListAria')}>
             {providers.map((provider) => {
               const isEditing = provider.id === editingProvider?.id
               return (
@@ -237,15 +233,15 @@ export function ClaudeAgentSettingsPage() {
                       <IconInline name="chevron" />
                     </span>
                     <span className="settings-provider-copy">
-                      <span className="settings-provider-model">{providerDisplayName(provider)}</span>
-                      <span className="settings-provider-meta">{providerMeta(provider)}</span>
+                      <span className="settings-provider-model">{providerDisplayName(provider, t)}</span>
+                      <span className="settings-provider-meta">{providerMeta(provider, t)}</span>
                     </span>
                   </button>
                   <button
                     type="button"
                     className="settings-icon-button"
-                    title={providers.length <= 1 ? '至少保留一个模型配置' : '删除模型配置'}
-                    aria-label="删除模型配置"
+                    title={providers.length <= 1 ? t('settings.models.deleteKeepOne') : t('settings.models.deleteProvider')}
+                    aria-label={t('settings.models.deleteAria')}
                     disabled={providers.length <= 1}
                     onClick={() => removeProvider(provider.id)}
                   >
@@ -259,19 +255,19 @@ export function ClaudeAgentSettingsPage() {
 
         <section className="settings-section" aria-labelledby="settings-section-connection-heading">
           <h2 id="settings-section-connection-heading" className="settings-section-heading">
-            填写条目详情
+            {t('settings.models.detailHeading')}
           </h2>
           <p id="settings-section-connection-desc" className="settings-section-caption">
-            对应上方列表中当前高亮的条目；在此处修改不会切换聊天正在使用的厂商（请到聊天输入框旁的模型菜单切换）。
+            {t('settings.models.detailCaption')}
           </p>
           <div className="settings-group" aria-describedby="settings-section-connection-desc">
             <div className="settings-field-row">
               <div className="settings-field-row__meta">
                 <label htmlFor="claude-provider-name" className="settings-field-row__label">
                   <IconInline name="settings" />
-                  配置名称
+                  {t('settings.models.fieldName')}
                 </label>
-                <p className="settings-field-row__hint">可选备注；用于在左侧列表中显示更易识别的标题。</p>
+                <p className="settings-field-row__hint">{t('settings.models.fieldNameHint')}</p>
               </div>
               <input
                 id="claude-provider-name"
@@ -279,7 +275,7 @@ export function ClaudeAgentSettingsPage() {
                 className="settings-input"
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="智谱 GLM"
+                placeholder={t('settings.models.fieldNamePlaceholder')}
                 value={editingProvider?.name ?? ''}
                 onChange={(event) => updateEditingProvider('name', event.target.value)}
               />
@@ -288,9 +284,9 @@ export function ClaudeAgentSettingsPage() {
               <div className="settings-field-row__meta">
                 <label htmlFor="claude-api-key" className="settings-field-row__label">
                   <IconInline name="key" />
-                  API Key
+                  {t('settings.models.fieldApiKey')}
                 </label>
-                <p className="settings-field-row__hint">对应 ANTHROPIC_API_KEY；可与环境变量组合使用（见配置来源）。</p>
+                <p className="settings-field-row__hint">{t('settings.models.fieldApiKeyHint')}</p>
               </div>
               <input
                 id="claude-api-key"
@@ -307,9 +303,9 @@ export function ClaudeAgentSettingsPage() {
               <div className="settings-field-row__meta">
                 <label htmlFor="claude-base-url" className="settings-field-row__label">
                   <IconInline name="server" />
-                  Base URL
+                  {t('settings.models.fieldBaseUrl')}
                 </label>
-                <p className="settings-field-row__hint">对应 ANTHROPIC_BASE_URL，留空则继续使用环境变量。</p>
+                <p className="settings-field-row__hint">{t('settings.models.fieldBaseUrlHint')}</p>
               </div>
               <input
                 id="claude-base-url"
@@ -326,9 +322,9 @@ export function ClaudeAgentSettingsPage() {
               <div className="settings-field-row__meta">
                 <label htmlFor="claude-haiku-model" className="settings-field-row__label">
                   <IconInline name="chip" />
-                  Haiku Model
+                  {t('settings.models.fieldHaiku')}
                 </label>
-                <p className="settings-field-row__hint">对应 ANTHROPIC_DEFAULT_HAIKU_MODEL。</p>
+                <p className="settings-field-row__hint">{t('settings.models.fieldHaikuHint')}</p>
               </div>
               <input
                 id="claude-haiku-model"
@@ -345,9 +341,9 @@ export function ClaudeAgentSettingsPage() {
               <div className="settings-field-row__meta">
                 <label htmlFor="claude-sonnet-model" className="settings-field-row__label">
                   <IconInline name="chip" />
-                  Sonnet Model
+                  {t('settings.models.fieldSonnet')}
                 </label>
-                <p className="settings-field-row__hint">对应 ANTHROPIC_DEFAULT_SONNET_MODEL。</p>
+                <p className="settings-field-row__hint">{t('settings.models.fieldSonnetHint')}</p>
               </div>
               <input
                 id="claude-sonnet-model"
@@ -364,9 +360,9 @@ export function ClaudeAgentSettingsPage() {
               <div className="settings-field-row__meta">
                 <label htmlFor="claude-opus-model" className="settings-field-row__label">
                   <IconInline name="chip" />
-                  Opus Model
+                  {t('settings.models.fieldOpus')}
                 </label>
-                <p className="settings-field-row__hint">对应 ANTHROPIC_DEFAULT_OPUS_MODEL。</p>
+                <p className="settings-field-row__hint">{t('settings.models.fieldOpusHint')}</p>
               </div>
               <input
                 id="claude-opus-model"
@@ -384,10 +380,10 @@ export function ClaudeAgentSettingsPage() {
 
         <section className="settings-section" aria-labelledby="settings-section-env-heading">
           <h2 id="settings-section-env-heading" className="settings-section-heading">
-            进程环境可读状态
+            {t('settings.models.envHeading')}
           </h2>
           <p id="settings-section-env-desc" className="settings-section-caption">
-            下列为主进程环境下的当前摘要，仅供参考，不会因点击保存而改写。
+            {t('settings.models.envCaption')}
           </p>
           <ul className="settings-env-tags" aria-describedby="settings-section-env-desc">
             {envStatusTags.map((tag) => (
@@ -400,11 +396,11 @@ export function ClaudeAgentSettingsPage() {
           <div className="settings-actions">
             <button type="submit" className="btn btn-primary" id="btn-save-claude-settings" disabled={saveDisabled || busy}>
               <IconInline name="save" />
-              <span>保存</span>
+              <span>{t('settings.models.save')}</span>
             </button>
             <button type="button" className="btn btn-ghost" id="btn-reload-claude-settings" onClick={() => void load()}>
               <IconInline name="refresh" />
-              <span>重新读取</span>
+              <span>{t('settings.models.reload')}</span>
             </button>
             <span className="settings-status" id="claude-settings-status" role="status">
               {status}
@@ -458,17 +454,30 @@ function createProviderId(): string {
   return `provider-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function providerDisplayName(provider: ClaudeAgentModelProvider): string {
-  return provider.model || provider.name || '未命名模型'
+function providerDisplayName(
+  provider: ClaudeAgentModelProvider,
+  t: (path: string, vars?: Record<string, string | number>) => string,
+): string {
+  return provider.model || provider.name || t('settings.models.unnamedModel')
 }
 
-function providerMeta(provider: ClaudeAgentModelProvider): string {
-  const parts = [provider.name && provider.model ? provider.name : '', provider.baseUrl, provider.apiKey ? 'API Key 已设置' : ''].filter(Boolean)
+function providerMeta(
+  provider: ClaudeAgentModelProvider,
+  t: (path: string, vars?: Record<string, string | number>) => string,
+): string {
+  const parts = [
+    provider.name && provider.model ? provider.name : '',
+    provider.baseUrl,
+    provider.apiKey ? t('settings.models.apiKeySet') : '',
+  ].filter(Boolean)
 
-  return parts.length ? parts.join(' · ') : '尚未配置 API Key / Base URL'
+  return parts.length ? parts.join(' · ') : t('settings.models.metaNoCredentials')
 }
 
-function createEnvStatusTags(snapshot: ClaudeAgentSettingsSnapshot): string[] {
+function createEnvStatusTags(
+  snapshot: ClaudeAgentSettingsSnapshot,
+  t: (path: string, vars?: Record<string, string | number>) => string,
+): string[] {
   const env = snapshot.env
   const modelMapping = [
     env.defaultHaikuModel ? `Haiku ${env.defaultHaikuModel}` : '',
@@ -480,12 +489,12 @@ function createEnvStatusTags(snapshot: ClaudeAgentSettingsSnapshot): string[] {
 
   return [
     env.hasApiKey
-      ? 'ENV API Key: 已设置'
+      ? t('settings.models.envApiKeySet')
       : env.hasAuthToken
-        ? 'ENV Auth Token: 已设置'
-        : 'ENV 凭据: 未设置',
-    env.baseUrl ? `ENV Base URL: ${env.baseUrl}` : 'ENV Base URL: 默认',
-    env.model ? `ENV Model: ${env.model}` : 'ENV Model: 默认',
-    modelMapping ? `ENV 模型映射: ${modelMapping}` : 'ENV 模型映射: 默认',
+        ? t('settings.models.envAuthTokenSet')
+        : t('settings.models.envCredentialsUnset'),
+    env.baseUrl ? t('settings.models.envBaseUrlValue', { value: env.baseUrl }) : t('settings.models.envBaseUrlDefault'),
+    env.model ? t('settings.models.envModelValue', { value: env.model }) : t('settings.models.envModelDefault'),
+    modelMapping ? t('settings.models.envMappingValue', { value: modelMapping }) : t('settings.models.envMappingDefault'),
   ]
 }

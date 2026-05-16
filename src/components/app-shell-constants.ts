@@ -7,31 +7,30 @@ export const SIDEBAR_MAX_RATIO = 0.3
 
 export const DEFAULT_SETTINGS_CATEGORY: SettingsCategoryId = 'general'
 
-/** 设置侧栏项：与 Codex「设置」左栏结构类似；未实现的项可标记 disabled */
+/** Settings sidebar `#settings/<id>` — labels via `t(settingsCategory.*)` */
 export const SETTINGS_SIDEBAR_NAV: {
   id: SettingsCategoryId
-  label: string
+  labelKey: string
   icon: IconName
   disabled?: boolean
 }[] = [
-  { id: 'general', label: '模型', icon: 'settings' },
-  { id: 'skills', label: '常规', icon: 'chip' },
+  { id: 'general', labelKey: 'settingsCategory.models', icon: 'settings' },
+  { id: 'skills', labelKey: 'settingsCategory.general', icon: 'chip' },
 ]
 
-export const VIEW_HEADINGS: Record<AppViewId, string> = {
-  home: 'Codex Chatbot',
-  docs: '文档',
-  settings: '设置',
+/** i18n keys for workspace title when not on settings */
+export const VIEW_HEADING_KEYS: Record<Exclude<AppViewId, 'settings'>, string> = {
+  home: 'shell.viewHome',
+  docs: 'shell.viewDocs',
 }
 
-export function settingsWorkspaceTitle(category: SettingsCategoryId): string {
-  if (category === 'skills') return '设置 · 常规'
-  return '设置 · 模型'
+export function settingsWorkspaceTitleKey(category: SettingsCategoryId): string {
+  return category === 'skills' ? 'shell.workspaceSettingsGeneral' : 'shell.workspaceSettingsModels'
 }
 
-export const NAV_LABELS: Record<'home' | 'docs', string> = {
-  home: '聊天',
-  docs: '文档',
+export const NAV_LABEL_KEYS: Record<'home' | 'docs', string> = {
+  home: 'nav.home',
+  docs: 'nav.docs',
 }
 
 export const NAV_VIEW_IDS = ['home', 'docs'] as const

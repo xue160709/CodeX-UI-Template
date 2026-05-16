@@ -45,6 +45,7 @@ declare global {
       listAgentContext?: (rootPath: string) => Promise<AgentContextResult>
       getChatWorkspace?: () => Promise<ChatWorkspaceState | null>
       saveChatWorkspace?: (state: ChatWorkspaceState) => Promise<ChatWorkspaceState>
+      quitApp?: () => Promise<void>
     }
   }
 }

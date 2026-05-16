@@ -1,5 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react'
 import { IconInline } from '../icon-inline'
+import { useI18n } from '../i18n/i18n'
 import type { AppViewId, ChatState, SettingsCategoryId, WorkspaceProject, WorkspaceThread } from './types'
 import { AppFilePanel } from './AppFilePanel'
 import { ChatPage, type ChatPageHandle } from './ChatPage'
@@ -43,6 +44,7 @@ export function AppShellWorkspace({
   showProjectSkillsInSidebar,
   onShowProjectSkillsInSidebarChange,
 }: AppShellWorkspaceProps) {
+  const { t } = useI18n()
   const isSettingsChromeHidden = activeViewId === 'settings'
   const [filePanelOpen, setFilePanelOpen] = useState(false)
 
@@ -65,8 +67,8 @@ export function AppShellWorkspace({
               type="button"
               className={`btn btn-toolbar${filePanelOpen ? ' is-active' : ''}`}
               id="btn-toggle-file-panel"
-              title="文件树"
-              aria-label="切换文件树面板"
+              title={t('workspace.fileTree')}
+              aria-label={t('workspace.toggleFilePanel')}
               aria-controls="app-file-panel"
               aria-expanded={filePanelOpen}
               onClick={() => setFilePanelOpen((open) => !open)}
