@@ -184,6 +184,8 @@
     "permissionModeTitle": "选择权限模式",
     "permissionModeAria": "选择权限模式",
     "permissionModeMenuAria": "权限模式",
+    "permissionModePlan": "计划模式",
+    "permissionModePlanDesc": "只做分析和方案，不执行写文件或命令。",
     "permissionModeAuto": "自动审查",
     "permissionModeAutoDesc": "SDK 自动判断工具请求，必要时继续向你确认。",
     "permissionModeDefault": "默认权限",

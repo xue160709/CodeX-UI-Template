@@ -1159,7 +1159,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function normalizeChatPermissionMode(value: ClaudePermissionMode | undefined): ClaudePermissionMode {
-  if (value === 'default' || value === 'bypassPermissions') return value
+  if (value === 'plan' || value === 'default' || value === 'bypassPermissions') return value
   return 'auto'
 }
 

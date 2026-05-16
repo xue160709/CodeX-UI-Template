@@ -6,7 +6,7 @@ export type ClaudeChatSubmitPayload = {
   permissionMode?: ClaudePermissionMode
 }
 
-export type ClaudePermissionMode = 'auto' | 'default' | 'bypassPermissions'
+export type ClaudePermissionMode = 'plan' | 'auto' | 'default' | 'bypassPermissions'
 
 export type ClaudeAskUserQuestionOption = {
   label: string

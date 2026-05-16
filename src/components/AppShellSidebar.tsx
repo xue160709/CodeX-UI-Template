@@ -89,7 +89,13 @@ export function AppShellSidebar({
   const isSettingsSidebar = activeViewId === 'settings'
   const [confirmingArchiveThreadId, setConfirmingArchiveThreadId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [skillTip, setSkillTip] = useState<{
+    text: string
+    skillPath: string
+    anchor: { left: number; top: number; width: number; height: number }
+  } | null>(null)
   const menuPanelRef = useRef<HTMLDivElement>(null)
+  const skillTipPanelRef = useRef<HTMLDivElement>(null)
   const isDarwin = typeof window !== 'undefined' && window.desktop?.platform === 'darwin'
 
   const sortedProjects = useMemo(() => {
@@ -100,6 +106,41 @@ export function AppShellSidebar({
   }, [projects])
 
   const closeContextMenu = () => setContextMenu(null)
+
+  useEffect(() => {
+    if (contextMenu) setSkillTip(null)
+  }, [contextMenu])
+
+  useLayoutEffect(() => {
+    if (!skillTip) return
+    const panel = skillTipPanelRef.current
+    if (!panel) return
+    const pad = 8
+    const gap = 8
+    const rect = panel.getBoundingClientRect()
+    const { left: ax, top: ay, width: aw, height: ah } = skillTip.anchor
+    let top = ay - rect.height - gap
+    if (top < pad) {
+      top = ay + ah + gap
+    }
+    let left = ax + aw / 2 - rect.width / 2
+    left = Math.min(Math.max(pad, left), window.innerWidth - pad - rect.width)
+    top = Math.min(Math.max(pad, top), window.innerHeight - pad - rect.height)
+    panel.style.left = `${left}px`
+    panel.style.top = `${top}px`
+  }, [skillTip])
+
+  useEffect(() => {
+    if (!skillTip) return
+    const close = () => setSkillTip(null)
+    window.addEventListener('resize', close)
+    const scrollRoot = sidebarRef.current?.querySelector('.app-sidebar-scroll')
+    scrollRoot?.addEventListener('scroll', close, { passive: true })
+    return () => {
+      window.removeEventListener('resize', close)
+      scrollRoot?.removeEventListener('scroll', close)
+    }
+  }, [skillTip, sidebarRef])
 
   useEffect(() => {
     if (!contextMenu) return
@@ -161,6 +202,7 @@ export function AppShellSidebar({
   }
 
   const openProjectMenu = (event: ReactMouseEvent, project: WorkspaceProject) => {
+    setSkillTip(null)
     event.preventDefault()
     event.stopPropagation()
     const isPinned = Boolean(project.pinnedAt)
@@ -204,6 +246,7 @@ export function AppShellSidebar({
   }
 
   const openSkillMenu = (event: ReactMouseEvent, projectId: string, skill: { path: string; title: string }) => {
+    setSkillTip(null)
     event.preventDefault()
     event.stopPropagation()
     setContextMenu({
@@ -233,6 +276,7 @@ export function AppShellSidebar({
   }
 
   const openThreadMenu = (event: ReactMouseEvent, thread: WorkspaceThread) => {
+    setSkillTip(null)
     event.preventDefault()
     event.stopPropagation()
     const isPinned = Boolean(thread.pinnedAt)
@@ -393,22 +437,39 @@ export function AppShellSidebar({
                               {projectSkillState?.loading ? (
                                 <div className="app-skill-empty">{t('sidebar.scanning')}</div>
                               ) : (
-                                visibleSkills.map((skill) => (
-                                  <button
-                                    key={skill.path}
-                                    type="button"
-                                    className="app-skill-row"
-                                    title={skill.description || skill.relativePath}
-                                    onContextMenu={(event) => openSkillMenu(event, project.id, skill)}
-                                    onClick={() => {
-                                      setConfirmingArchiveThreadId(null)
-                                      onRunProjectSkill(project.id, skill.title)
-                                    }}
-                                  >
-                                    <IconInline name="chip" />
-                                    <span className="app-skill-title">{skill.title}</span>
-                                  </button>
-                                ))
+                                visibleSkills.map((skill) => {
+                                  const tipText = skill.description.trim()
+                                  const tipActive = Boolean(tipText) && skillTip?.skillPath === skill.path
+                                  return (
+                                    <button
+                                      key={skill.path}
+                                      type="button"
+                                      className="app-skill-row"
+                                      title={tipText ? undefined : skill.relativePath}
+                                      aria-describedby={tipActive ? 'app-sidebar-skill-tip' : undefined}
+                                      onPointerEnter={(event) => {
+                                        if (!tipText) return
+                                        const r = event.currentTarget.getBoundingClientRect()
+                                        setSkillTip({
+                                          text: tipText,
+                                          skillPath: skill.path,
+                                          anchor: { left: r.left, top: r.top, width: r.width, height: r.height },
+                                        })
+                                      }}
+                                      onPointerLeave={() => {
+                                        setSkillTip((prev) => (prev?.skillPath === skill.path ? null : prev))
+                                      }}
+                                      onContextMenu={(event) => openSkillMenu(event, project.id, skill)}
+                                      onClick={() => {
+                                        setConfirmingArchiveThreadId(null)
+                                        onRunProjectSkill(project.id, skill.title)
+                                      }}
+                                    >
+                                      <IconInline name="chip" />
+                                      <span className="app-skill-title">{skill.title}</span>
+                                    </button>
+                                  )
+                                })
                               )}
                             </div>
                           </div>
@@ -542,6 +603,17 @@ export function AppShellSidebar({
               {item.label}
             </button>
           ))}
+        </div>
+      ) : null}
+      {skillTip ? (
+        <div
+          ref={skillTipPanelRef}
+          id="app-sidebar-skill-tip"
+          className="app-sidebar-context-menu app-sidebar-context-menu--skill-tip"
+          role="tooltip"
+          style={{ left: 0, top: 0 }}
+        >
+          <p className="app-sidebar-context-menu__tip-text">{skillTip.text}</p>
         </div>
       ) : null}
     </>

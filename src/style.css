@@ -759,6 +759,29 @@ html[data-window-effects='mac-vibrancy'] .app-sidebar {
   background: color-mix(in oklab, var(--red-500) 14%, transparent);
 }
 
+.app-sidebar-context-menu--skill-tip {
+  min-width: 200px;
+  max-width: min(320px, calc(100vw - 16px));
+  overflow: hidden;
+  padding: calc(var(--spacing) * 1.25) calc(var(--spacing) * 2);
+  pointer-events: none;
+}
+
+.app-sidebar-context-menu__tip-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  font-weight: var(--font-weight-normal);
+  color: var(--color-token-description-foreground);
+  word-break: break-word;
+  white-space: pre-line;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
+}
+
 .app-nav-item {
   display: flex;
   align-items: center;

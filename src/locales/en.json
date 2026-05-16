@@ -184,6 +184,8 @@
     "permissionModeTitle": "Choose permission mode",
     "permissionModeAria": "Choose permission mode",
     "permissionModeMenuAria": "Permission modes",
+    "permissionModePlan": "Plan",
+    "permissionModePlanDesc": "Analyze and propose a plan without running file edits or commands.",
     "permissionModeAuto": "Auto Review",
     "permissionModeAutoDesc": "The SDK classifies tool requests and still asks you when needed.",
     "permissionModeDefault": "Default",

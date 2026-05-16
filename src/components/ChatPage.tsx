@@ -2011,20 +2011,25 @@ function readStoredPermissionMode(): ClaudePermissionMode {
 }
 
 function isClaudePermissionMode(value: unknown): value is ClaudePermissionMode {
-  return value === 'auto' || value === 'default' || value === 'bypassPermissions'
+  return value === 'plan' || value === 'auto' || value === 'default' || value === 'bypassPermissions'
 }
 
 function getPermissionModeRows(t: (path: string, vars?: Record<string, string | number>) => string): PermissionModeRow[] {
   return [
+    {
+      mode: 'default',
+      label: t('chat.permissionModeDefault'),
+      description: t('chat.permissionModeDefaultDesc'),
+    },
     {
       mode: 'auto',
       label: t('chat.permissionModeAuto'),
       description: t('chat.permissionModeAutoDesc'),
     },
     {
-      mode: 'default',
-      label: t('chat.permissionModeDefault'),
-      description: t('chat.permissionModeDefaultDesc'),
+      mode: 'plan',
+      label: t('chat.permissionModePlan'),
+      description: t('chat.permissionModePlanDesc'),
     },
     {
       mode: 'bypassPermissions',
