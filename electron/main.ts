@@ -228,6 +228,13 @@ function getTrayImage() {
   return image
 }
 
+function showMainWindow() {
+  if (!win || win.isDestroyed()) return
+  if (win.isMinimized()) win.restore()
+  if (!win.isVisible()) win.show()
+  win.focus()
+}
+
 function buildTrayContextMenu() {
   const locale = currentTrayLocale
   return Menu.buildFromTemplate([
@@ -267,8 +274,13 @@ function ensureTray() {
     tray = new Tray(getTrayImage())
     const name = app.getName()
     tray.setToolTip(name)
+    tray.on('click', () => {
+      showMainWindow()
+    })
+    tray.on('right-click', () => {
+      tray?.popUpContextMenu(buildTrayContextMenu())
+    })
   }
-  tray.setContextMenu(buildTrayContextMenu())
 }
 
 function applyLoginItemSettingsFromPrefs(prefs: DesktopPreferences) {
