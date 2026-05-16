@@ -15,7 +15,7 @@ import { AppFileTreePane, type AppFileTreePaneHandle } from './AppFileTreePane'
 import { AppWorkspaceSidePanel, type WorkspaceSidePanelTab } from './AppWorkspaceSidePanel'
 import { ChatPage, type ChatPageHandle } from './chat/ChatPage'
 import { DocsPage } from './DocsPage'
-import { SettingsPage } from './SettingsPage'
+import { SettingsPage } from './setting/SettingsPage'
 import { useWorkspaceAgentMode } from './useWorkspaceAgentMode'
 
 type SidePanelState = {

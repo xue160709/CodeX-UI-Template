@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { IconInline } from '../icon-inline'
-import { getInitialLocale, LOCALE_STORAGE_KEY, useI18n, type AppLocale } from '../i18n/i18n'
+import { IconInline } from '../../icon-inline'
+import { getInitialLocale, LOCALE_STORAGE_KEY, useI18n, type AppLocale } from '../../i18n/i18n'
 
 type ProjectSkillsSettingsPageProps = {
   enabled: boolean

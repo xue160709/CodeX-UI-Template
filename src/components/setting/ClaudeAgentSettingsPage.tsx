@@ -4,9 +4,9 @@ import type {
   ClaudeAgentModelProvider,
   ClaudeAgentSettings,
   ClaudeAgentSettingsSnapshot,
-} from '../claude-chat-types'
-import { IconInline } from '../icon-inline'
-import { getInitialLocale, translate, useI18n } from '../i18n/i18n'
+} from '../../claude-chat-types'
+import { IconInline } from '../../icon-inline'
+import { getInitialLocale, translate, useI18n } from '../../i18n/i18n'
 
 const SETTINGS_CHANGED_EVENT = 'claude-agent-settings:changed'
 

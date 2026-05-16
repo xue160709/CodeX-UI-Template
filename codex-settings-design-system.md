@@ -92,4 +92,4 @@ Codex 的 Renderer 并非单独造一套「设置页设计语言」，而是在 
 - `codex-css-tokens.css` — 完整变量清单（含 `--vscode-settings-*`）  
 - `codex-ui-framework-notes.md` — Shell、主题与 token 总则  
 - `src/theme/tokens.css` — 本项目落地 token  
-- `src/components/SettingsPage.tsx` — 本项目设置页结构与文案  
+- `src/components/setting/SettingsPage.tsx` — 本项目设置页结构与文案  

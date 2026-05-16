@@ -1,7 +1,7 @@
 import { AgentModeSettingsPage } from './AgentModeSettingsPage'
 import { ClaudeAgentSettingsPage } from './ClaudeAgentSettingsPage'
 import { ProjectSkillsSettingsPage } from './ProjectSkillsSettingsPage'
-import type { SettingsCategoryId, WorkspaceProject } from './types'
+import type { SettingsCategoryId, WorkspaceProject } from '../types'
 
 type SettingsPageProps = {
   hidden: boolean

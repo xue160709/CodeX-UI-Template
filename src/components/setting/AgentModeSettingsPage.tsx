@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { IconInline } from '../icon-inline'
-import { useI18n } from '../i18n/i18n'
-import type { AgentModeProjectSettings } from '../desktop-types'
-import type { WorkspaceProject } from './types'
+import { IconInline } from '../../icon-inline'
+import { useI18n } from '../../i18n/i18n'
+import type { AgentModeProjectSettings } from '../../desktop-types'
+import type { WorkspaceProject } from '../types'
 
 type AgentModeSettingsPageProps = {
   project: WorkspaceProject
