@@ -203,10 +203,86 @@ function finalizeHtml(html) {
   reportHeight();
 }
 
+function captureSvg() {
+  const rect = root.getBoundingClientRect();
+  const width = Math.max(1, Math.ceil(rect.width || root.scrollWidth || 920));
+  const height = Math.max(1, Math.ceil(rect.height || root.scrollHeight || 320));
+  const serializer = new XMLSerializer();
+  const svgNs = 'http://www.w3.org/2000/svg';
+  const styleText = Array.from(document.querySelectorAll('style')).map((style) => style.textContent || '').join('\\n');
+  const varText = collectCssVars(styleText);
+  const visualChildren = Array.from(root.children).filter((node) => {
+    const tag = node.tagName.toLowerCase();
+    return tag !== 'style' && tag !== 'script';
+  });
+
+  if (visualChildren.length === 1 && visualChildren[0].tagName.toLowerCase() === 'svg') {
+    const svg = visualChildren[0].cloneNode(true);
+    svg.setAttribute('xmlns', svgNs);
+    svg.setAttribute('width', String(width));
+    svg.setAttribute('height', String(height));
+    if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+    svg.setAttribute('style', varText + (svg.getAttribute('style') || ''));
+    if (styleText.trim()) {
+      const styleNode = document.createElementNS(svgNs, 'style');
+      styleNode.textContent = styleText;
+      svg.insertBefore(styleNode, svg.firstChild);
+    }
+    return serializer.serializeToString(svg);
+  }
+
+  const wrapper = document.createElement('div');
+  wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+  wrapper.setAttribute('style', varText + 'width:' + width + 'px;min-height:' + height + 'px;margin:0;background:transparent;color:var(--color-text-primary);font-family:var(--font-sans);');
+  if (styleText.trim()) {
+    const styleNode = document.createElement('style');
+    styleNode.textContent = styleText;
+    wrapper.appendChild(styleNode);
+  }
+  const rootClone = root.cloneNode(true);
+  rootClone.querySelectorAll('script').forEach((node) => node.remove());
+  wrapper.appendChild(rootClone);
+  return '<svg xmlns="' + svgNs + '" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '"><foreignObject width="100%" height="100%">' + serializer.serializeToString(wrapper) + '</foreignObject></svg>';
+}
+
+function collectCssVars(styleText) {
+  const computed = getComputedStyle(document.documentElement);
+  const names = {};
+  styleText.replace(/--[A-Za-z0-9_-]+/g, (name) => {
+    names[name] = true;
+    return name;
+  });
+  [
+    '--font-sans',
+    '--font-mono',
+    '--color-background-primary',
+    '--color-background-secondary',
+    '--color-background-tertiary',
+    '--color-text-primary',
+    '--color-text-secondary',
+    '--color-text-tertiary',
+    '--color-border-primary',
+    '--color-border-secondary',
+    '--color-border-tertiary',
+    '--color-accent-primary',
+    '--border-radius-md',
+    '--border-radius-lg',
+  ].forEach((name) => {
+    names[name] = true;
+  });
+  return Object.keys(names).map((name) => {
+    const value = computed.getPropertyValue(name).trim();
+    return value ? name + ':' + value + ';' : '';
+  }).join('');
+}
+
 window.addEventListener('message', (event) => {
   if (!event.data || typeof event.data.type !== 'string') return;
   if (event.data.type === 'generative-ui:update') applyHtml(String(event.data.html || ''));
   if (event.data.type === 'generative-ui:finalize') finalizeHtml(String(event.data.html || ''));
+  if (event.data.type === 'generative-ui:capture-svg') {
+    parent.postMessage({ type: 'generative-ui:download-svg', svg: captureSvg() }, '*');
+  }
   if (event.data.type === 'generative-ui:theme') {
     const vars = event.data.vars || {};
     for (const [name, value] of Object.entries(vars)) {
@@ -287,6 +363,12 @@ export function buildWidgetStyleBlock(vars: Record<string, string>): string {
 html,body{margin:0;padding:0;background:transparent;color:var(--color-text-primary);font-family:var(--font-sans);font-size:14px;line-height:1.5;}
 body{overflow:hidden;}
 #widget-root{height:fit-content;min-height:1px;}
+#widget-root > :not(style):not(script){max-width:100% !important;}
+#widget-root > div:not([data-keep-width]),
+#widget-root > section:not([data-keep-width]),
+#widget-root > main:not([data-keep-width]),
+#widget-root > article:not([data-keep-width]),
+#widget-root > svg{width:100% !important;}
 a{color:var(--color-accent-primary);text-decoration:none;}
 button,input,select,textarea{font:inherit;}
 button{cursor:pointer;}

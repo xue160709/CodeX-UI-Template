@@ -2574,7 +2574,7 @@ button.app-file-tree-row {
 }
 
 .chat-transcript {
-  width: min(860px, 100%);
+  width: min(920px, 100%);
   min-height: 100%;
   margin: 0 auto;
   padding-bottom: calc(var(--spacing) * 5);
@@ -3145,6 +3145,15 @@ button.app-file-tree-row {
   width: min(760px, 100%);
 }
 
+.chat-message--assistant:has(.generative-widget) .chat-message__stack {
+  width: min(920px, 100%);
+  max-width: min(920px, 100%);
+}
+
+.chat-message--assistant:has(.generative-widget) .chat-message__bubble {
+  width: 100%;
+}
+
 .chat-message__duration {
   display: inline-flex;
   align-items: center;
@@ -3433,7 +3442,7 @@ button.app-file-tree-row {
 
 .generative-widget {
   position: relative;
-  width: min(760px, 100%);
+  width: 100%;
   min-width: 0;
   border: 1px solid color-mix(in oklab, var(--color-token-border) 72%, transparent);
   border-radius: calc(var(--radius-xl) + 2px);
@@ -3487,6 +3496,9 @@ button.app-file-tree-row {
   position: absolute;
   top: calc(var(--spacing) * 2);
   right: calc(var(--spacing) * 2);
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--spacing) * 1);
   opacity: 0;
   transform: translateY(-2px);
   transition:
@@ -4261,6 +4273,10 @@ button.app-file-tree-row {
 
   .chat-message__bubble {
     max-width: 94%;
+  }
+
+  .chat-message--assistant:has(.generative-widget) .chat-message__bubble {
+    max-width: 100%;
   }
 
   .composer-attachment {

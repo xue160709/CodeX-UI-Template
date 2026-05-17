@@ -107,12 +107,18 @@ export const GenerativeWidget = memo(function GenerativeWidget({
 
       if (event.data.type === 'generative-ui:scripts-ready') {
         setFinalized(true)
+        return
+      }
+
+      if (event.data.type === 'generative-ui:download-svg') {
+        const svg = String(event.data.svg || '')
+        if (svg.trim()) downloadSvgFile(svg, title || 'generative-widget')
       }
     }
 
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [widgetCode])
+  }, [title, widgetCode])
 
   useEffect(() => {
     if (!ready) return
@@ -168,6 +174,11 @@ export const GenerativeWidget = memo(function GenerativeWidget({
   }, [hasExternalScript, ready, streaming, widgetCode])
 
   const loadingOverlay = showOverlay || (!streaming && hasExternalScript && ready && !finalized)
+  const requestSvgDownload = () => {
+    postWidgetMessage(iframeRef.current, {
+      type: 'generative-ui:capture-svg',
+    })
+  }
 
   return (
     <section className="generative-widget" aria-label={title || t('chat.generativeUiAria')}>
@@ -194,6 +205,9 @@ export const GenerativeWidget = memo(function GenerativeWidget({
         <button type="button" onClick={() => setShowCode((value) => !value)}>
           {showCode ? t('chat.generativeUiHideCode') : t('chat.generativeUiShowCode')}
         </button>
+        <button type="button" onClick={requestSvgDownload}>
+          {t('chat.generativeUiDownloadSvg')}
+        </button>
       </div>
     </section>
   )
@@ -207,4 +221,25 @@ function postWidgetMessage(iframe: HTMLIFrameElement | null, message: Record<str
   const target = iframe?.contentWindow
   if (!target) return
   target.postMessage(message, '*')
+}
+
+function downloadSvgFile(svg: string, title: string) {
+  const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${safeFileName(title)}.svg`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+function safeFileName(value: string): string {
+  const next = value
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return next || 'generative-widget'
 }

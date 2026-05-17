@@ -341,6 +341,7 @@
     "generativeUiPreparing": "正在准备可视化",
     "generativeUiShowCode": "查看代码",
     "generativeUiHideCode": "隐藏代码",
+    "generativeUiDownloadSvg": "下载 SVG",
     "editMessage": "编辑消息",
     "editMessageAria": "编辑用户消息",
     "editCancel": "取消",

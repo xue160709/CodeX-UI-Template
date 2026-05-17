@@ -17,6 +17,7 @@ Rules:
 - The widget runs in a sandboxed iframe. Scripts are allowed only after the widget is complete.
 - For streaming stability, output HTML in this order: style, visible content, script last.
 - Prefer inline SVG for diagrams; use <svg width="100%" viewBox="0 0 680 H">.
+- Fill the host width. Do not hard-code narrow outer widths such as 360px/480px; use width:100% and responsive viewBox/layout.
 - Use transparent outer backgrounds and CSS variables when possible: --color-background-primary, --color-text-primary, --color-text-secondary, --color-border-tertiary, --font-sans.
 - Keep each widget compact. If multiple visuals are needed, emit multiple separate show-widget fences.
 - Interactive drill-down buttons may call window.__widgetSendMessage("follow-up request").

@@ -341,6 +341,7 @@
     "generativeUiPreparing": "Preparing visualization",
     "generativeUiShowCode": "Show code",
     "generativeUiHideCode": "Hide code",
+    "generativeUiDownloadSvg": "Download SVG",
     "editMessage": "Edit message",
     "editMessageAria": "Edit user message",
     "editCancel": "Cancel",
