@@ -3113,9 +3113,22 @@ button.app-file-tree-row {
   justify-content: flex-start;
 }
 
-.chat-message__bubble {
+.chat-message__stack {
+  display: flex;
   min-width: 0;
   max-width: min(760px, 86%);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(var(--spacing) * 1);
+}
+
+.chat-message--user .chat-message__stack {
+  align-items: flex-end;
+}
+
+.chat-message__bubble {
+  min-width: 0;
+  max-width: 100%;
   color: var(--color-token-text-primary);
   font-size: var(--text-base);
   line-height: 1.62;
@@ -3130,6 +3143,210 @@ button.app-file-tree-row {
 
 .chat-message--assistant .chat-message__bubble {
   width: min(760px, 100%);
+}
+
+.chat-message__duration {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--spacing) * 1);
+  min-height: 30px;
+  color: var(--color-token-text-tertiary);
+  font-size: var(--text-sm);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-message__duration .icon-xs {
+  width: 14px;
+  height: 14px;
+}
+
+.chat-message-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--spacing) * 1);
+  min-height: 32px;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition:
+    opacity var(--transition-duration-basic) var(--transition-ease-basic),
+    transform var(--transition-duration-basic) var(--transition-ease-basic);
+}
+
+.chat-message:hover .chat-message-actions,
+.chat-message:focus-within .chat-message-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.chat-message-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-token-text-tertiary);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background var(--transition-duration-basic) var(--transition-ease-basic),
+    color var(--transition-duration-basic) var(--transition-ease-basic);
+}
+
+.chat-message-action:hover,
+.chat-message-action:focus-visible {
+  color: var(--color-token-text-secondary);
+  background: var(--color-token-list-hover-background);
+}
+
+.chat-message-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* 编辑卡片宽度约为会话栏一半，仍靠右（article 为 flex-end）；不撑宽 transcript，其它消息布局不变 */
+.chat-message--user .chat-message__stack:has(.chat-message-edit) {
+  width: min(430px, 50%);
+  max-width: 100%;
+}
+
+.chat-message--user .chat-message__bubble:has(.chat-message-edit) {
+  width: 100%;
+  max-width: 100%;
+  padding: 12px;
+}
+
+/* 编辑态：与参考图一致——整块浅灰圆角面板即气泡本身，内层不再叠卡片 */
+.chat-message-edit {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  gap: calc(var(--spacing) * 1.5);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow-anchor: none;
+}
+
+.chat-message-edit textarea {
+  width: 100%;
+  min-height: 64px;
+  max-height: min(180px, 26vh);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  resize: none;
+  background: transparent;
+  color: var(--color-token-text-primary);
+  font: inherit;
+  font-size: var(--text-base);
+  line-height: 1.62;
+  transition: none;
+}
+
+.chat-message-edit textarea::placeholder {
+  color: var(--color-token-input-placeholder-foreground);
+}
+
+/* 不使用蓝色焦点环，避免与浅灰气泡冲突；光标与占位符已足以表明焦点 */
+.chat-message-edit textarea:focus,
+.chat-message-edit textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.chat-message-edit__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: calc(var(--spacing) * 2);
+  padding-top: calc(var(--spacing) * 1);
+  border-top: 0;
+}
+
+/* 与全局 `.btn-compact` 节奏对齐：更小内边距与字号，仍保留略高的 min-height 便于触控 */
+.chat-message-edit__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--spacing) * 0.75);
+  min-height: 30px;
+  padding: 0 calc(var(--spacing) * 2);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-duration-basic) var(--transition-ease-basic),
+    color var(--transition-duration-basic) var(--transition-ease-basic),
+    border-color var(--transition-duration-basic) var(--transition-ease-basic),
+    opacity var(--transition-duration-basic) var(--transition-ease-basic),
+    transform var(--transition-duration-basic) var(--transition-ease-basic);
+}
+
+.chat-message-edit__btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.chat-message-edit__btn--cancel {
+  border-color: var(--color-token-border);
+  background: var(--color-token-main-surface-primary);
+  color: var(--color-token-text-primary);
+}
+
+.chat-message-edit__btn--cancel:hover {
+  background: color-mix(in oklab, var(--color-token-main-surface-primary) 90%, var(--color-token-list-hover-background));
+}
+
+.chat-message-edit__btn--submit {
+  border-color: transparent;
+  background: var(--color-token-button-background);
+  color: var(--color-token-button-foreground);
+}
+
+.chat-message-edit__btn--submit:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.chat-message-edit__btn--submit:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.chat-message-edit__btn:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-token-focus-border) 85%, transparent);
+  outline-offset: 2px;
+}
+
+.chat-message-edit__btn svg {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-message-edit__btn {
+    transition: none;
+  }
+
+  .chat-message-edit__btn:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+@media (hover: none) {
+  .chat-message-actions {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .chat-message--error .chat-message__bubble {

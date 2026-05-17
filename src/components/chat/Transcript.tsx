@@ -3,7 +3,7 @@
  * Timeline renderer for messages, tool chips, thinking, and agent activity rows.
  */
 
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { IconInline } from '../../icon-inline'
 import { useI18n } from '../../i18n/i18n'
 import type {
@@ -18,16 +18,24 @@ import type {
   TranscriptItem,
 } from '../types'
 import { AttachmentThumb } from './AttachmentThumb'
-import { formatBytes } from './format'
+import { formatBytes, formatDuration } from './format'
 import { escapeHtml, renderMarkdown } from './markdown'
 
 /** Memoized transcript map / Memoized transcript list renderer */
 export const Transcript = memo(function Transcript({
   items,
+  isRunning = false,
+  onCopyMessage,
+  onEditUserMessage,
+  onUserMessageEditDismissed,
   onReviewFileChanges,
   onRewindFileChanges,
 }: {
   items: TranscriptItem[]
+  isRunning?: boolean
+  onCopyMessage?: (text: string) => void
+  onEditUserMessage?: (messageId: string, text: string) => void
+  onUserMessageEditDismissed?: () => void
   onReviewFileChanges?: (changeSetId: string) => void
   onRewindFileChanges?: (item: ChatFileDiffItem) => void
 }) {
@@ -47,13 +55,48 @@ export const Transcript = memo(function Transcript({
             />
           )
         }
-        return <ChatMessage key={item.id} item={item} />
+        return (
+          <ChatMessage
+            key={item.id}
+            item={item}
+            canEdit={!isRunning}
+            onCopyMessage={onCopyMessage}
+            onEditUserMessage={onEditUserMessage}
+            onUserMessageEditDismissed={onUserMessageEditDismissed}
+          />
+        )
       })}
     </>
   )
 })
 
-const ChatMessage = memo(function ChatMessage({ item }: { item: ChatMessageItem }) {
+const ChatMessage = memo(function ChatMessage({
+  item,
+  canEdit,
+  onCopyMessage,
+  onEditUserMessage,
+  onUserMessageEditDismissed,
+}: {
+  item: ChatMessageItem
+  canEdit: boolean
+  onCopyMessage?: (text: string) => void
+  onEditUserMessage?: (messageId: string, text: string) => void
+  onUserMessageEditDismissed?: () => void
+}) {
+  const { t } = useI18n()
+  const [isEditing, setIsEditing] = useState(false)
+  const [draft, setDraft] = useState(item.content)
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (!isEditing) setDraft(item.content)
+  }, [isEditing, item.content])
+
+  useLayoutEffect(() => {
+    if (!isEditing) return
+    editTextareaRef.current?.focus({ preventScroll: true })
+  }, [isEditing])
+
   const bodyHtml = useMemo(() => {
     if (item.role === 'assistant') {
       return renderMarkdown(item.content || (item.status === 'streaming' ? '' : ' '))
@@ -66,12 +109,97 @@ const ChatMessage = memo(function ChatMessage({ item }: { item: ChatMessageItem 
   const suffix = item.role === 'assistant' && item.status === 'streaming' ? '<span class="typing-dot"></span>' : ''
   const hasBody = item.content.trim().length > 0 || item.role === 'assistant'
   const attachments = item.attachments ?? []
+  const durationLabel = item.role === 'assistant' && item.durationMs ? formatDuration(item.durationMs) : ''
+  const canCopy = item.content.trim().length > 0
+  const canSaveEdit = draft.trim().length > 0 && draft.trim() !== item.content.trim()
+
+  const saveEdit = () => {
+    const next = draft.trim()
+    if (!next) return
+    setIsEditing(false)
+    onEditUserMessage?.(item.id, next)
+  }
 
   return (
     <article className={`chat-message chat-message--${item.role} chat-message--${item.status}`}>
-      <div className="chat-message__bubble markdown-body">
-        {attachments.length > 0 ? <ChatAttachmentList attachments={attachments} /> : null}
-        {hasBody ? <div dangerouslySetInnerHTML={{ __html: bodyHtml + suffix }} /> : null}
+      <div className="chat-message__stack">
+        {durationLabel ? (
+          <span className="chat-message__duration" title={t('chat.responseDurationTitle')} aria-label={t('chat.responseDurationTitle')}>
+            <span>{t('chat.responseProcessed')}</span>
+            <span>{durationLabel}</span>
+            <IconInline name="chevron" />
+          </span>
+        ) : null}
+        <div className="chat-message__bubble markdown-body">
+          {attachments.length > 0 ? <ChatAttachmentList attachments={attachments} /> : null}
+          {isEditing ? (
+            <div className="chat-message-edit">
+              <textarea
+                ref={editTextareaRef}
+                value={draft}
+                aria-label={t('chat.editMessageAria')}
+                onChange={(event) => setDraft(event.currentTarget.value)}
+                onKeyDown={(event) => {
+                  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                    event.preventDefault()
+                    if (canSaveEdit) saveEdit()
+                  }
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    onUserMessageEditDismissed?.()
+                    setIsEditing(false)
+                    setDraft(item.content)
+                  }
+                }}
+              />
+              <div className="chat-message-edit__actions">
+                <button
+                  type="button"
+                  className="chat-message-edit__btn chat-message-edit__btn--cancel"
+                  onClick={() => {
+                    onUserMessageEditDismissed?.()
+                    setIsEditing(false)
+                  }}
+                >
+                  <IconInline name="x" />
+                  <span>{t('chat.editCancel')}</span>
+                </button>
+                <button type="button" className="chat-message-edit__btn chat-message-edit__btn--submit" disabled={!canSaveEdit} onClick={saveEdit}>
+                  <IconInline name="check" />
+                  <span>{t('chat.editSubmit')}</span>
+                </button>
+              </div>
+            </div>
+          ) : hasBody ? (
+            <div dangerouslySetInnerHTML={{ __html: bodyHtml + suffix }} />
+          ) : null}
+        </div>
+        {!isEditing ? (
+          <div className="chat-message-actions" aria-label={t('chat.messageActionsAria')}>
+            <button
+              type="button"
+              className="chat-message-action"
+              disabled={!canCopy}
+              title={t('chat.copyMessage')}
+              aria-label={t('chat.copyMessage')}
+              onClick={() => onCopyMessage?.(item.content)}
+            >
+              <IconInline name="copy" />
+            </button>
+            {item.role === 'user' ? (
+              <button
+                type="button"
+                className="chat-message-action"
+                disabled={!canEdit}
+                title={t('chat.editMessage')}
+                aria-label={t('chat.editMessage')}
+                onClick={() => setIsEditing(true)}
+              >
+                <IconInline name="edit" />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </article>
   )

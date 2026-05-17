@@ -11,10 +11,14 @@ import { Transcript } from './Transcript'
 
 type ChatThreadViewProps = {
   items: TranscriptItem[]
+  isRunning: boolean
   composer: ReactNode
   scrollRegionRef: RefObject<HTMLDivElement | null>
   showScrollButton: boolean
   onScrollToBottom: (behavior: ScrollBehavior) => void
+  onCopyMessage: (text: string) => void
+  onEditUserMessage: (messageId: string, text: string) => void
+  onUserMessageEditDismissed?: () => void
   onReviewFileChanges: (changeSetId: string) => void
   onRewindFileChanges: (item: ChatFileDiffItem) => void
 }
@@ -22,10 +26,14 @@ type ChatThreadViewProps = {
 /** Thread timeline chrome wrapping scroll hints / Timeline chrome around transcript scroll controls */
 export function ChatThreadView({
   items,
+  isRunning,
   composer,
   scrollRegionRef,
   showScrollButton,
   onScrollToBottom,
+  onCopyMessage,
+  onEditUserMessage,
+  onUserMessageEditDismissed,
   onReviewFileChanges,
   onRewindFileChanges,
 }: ChatThreadViewProps) {
@@ -35,7 +43,15 @@ export function ChatThreadView({
     <>
       <div className="chat-scroll-region" id="chat-scroll-region" ref={scrollRegionRef}>
         <div className="chat-transcript" id="chat-transcript" aria-live="polite">
-          <Transcript items={items} onReviewFileChanges={onReviewFileChanges} onRewindFileChanges={onRewindFileChanges} />
+          <Transcript
+            items={items}
+            isRunning={isRunning}
+            onCopyMessage={onCopyMessage}
+            onEditUserMessage={onEditUserMessage}
+            onUserMessageEditDismissed={onUserMessageEditDismissed}
+            onReviewFileChanges={onReviewFileChanges}
+            onRewindFileChanges={onRewindFileChanges}
+          />
         </div>
       </div>
       <button

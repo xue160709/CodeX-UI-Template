@@ -38,6 +38,10 @@ export type ChatMessageItem = {
   role: 'user' | 'assistant'
   content: string
   status: MessageStatus
+  createdAt?: number
+  startedAt?: number
+  completedAt?: number
+  durationMs?: number
   attachments?: ChatMessageAttachment[]
 }
 
@@ -143,6 +147,7 @@ export type WorkspaceThread = {
 export type ThreadRunState = {
   requestId: string
   status: ThreadRunStatus
+  startedAt?: number
   updatedAt: number
 }
 

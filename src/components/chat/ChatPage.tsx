@@ -79,6 +79,8 @@ type ChatPageProps = {
 type SubmitPromptTarget = {
   threadId?: string
   project?: WorkspaceProject
+  reuseUserMessageId?: string
+  resetSession?: boolean
 }
 
 /** 内置 slash 命令清单 / Built-in slash commands backed by i18n strings */
@@ -165,6 +167,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
   const threadRunStatesRef = useRef<Record<string, ThreadRunState>>(threadRunStates)
   const requestThreadIdsRef = useRef(new Map<string, string>())
   const requestAssistantMessageIdsRef = useRef(new Map<string, string>())
+  const requestStartedAtRef = useRef(new Map<string, number>())
   const finishedRequestIdsRef = useRef(new Set<string>())
 
   /** Popover anchor avoids clipping by `.chat-composer` / fixed positioning avoids composer clipping */
@@ -181,6 +184,8 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     maxHeight: number
   } | null>(null)
   const scrollIntentRef = useRef<'none' | 'force-bottom'>('none')
+  /** 取消 / Esc 关闭编辑时抑制贴底，避免 ResizeObserver 误判 isNearBottom 把视口滚到底 */
+  const suppressTranscriptResizeStickRef = useRef(false)
   const isFirstTranscriptLayoutRef = useRef(true)
   const isRunningRef = useRef(false)
   const globalDisplayModelRef = useRef(globalDisplayModel)
@@ -514,11 +519,29 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     setShowScrollButton((prev) => shouldShowScrollToBottom(sr, prev))
   }, [])
 
+  const notifyUserMessageEditDismissed = useCallback(() => {
+    suppressTranscriptResizeStickRef.current = true
+    window.setTimeout(() => {
+      suppressTranscriptResizeStickRef.current = false
+    }, 280)
+  }, [])
+
   useLayoutEffect(() => {
     const sr = scrollRegionRef.current
     if (!sr || !hasMessages) {
       isFirstTranscriptLayoutRef.current = false
       setShowScrollButton(false)
+      return
+    }
+    const transcriptEl = sr.querySelector('.chat-transcript')
+    if (transcriptEl?.querySelector('.chat-message-edit')) {
+      scrollIntentRef.current = 'none'
+      syncScrollButtonVisibility()
+      return
+    }
+    if (suppressTranscriptResizeStickRef.current) {
+      scrollIntentRef.current = 'none'
+      syncScrollButtonVisibility()
       return
     }
     let stick = scrollIntentRef.current === 'force-bottom' || isNearBottom(sr)
@@ -552,6 +575,14 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     if (!sr || !transcript || !hasMessages) return
 
     const ro = new ResizeObserver(() => {
+      if (transcript.querySelector('.chat-message-edit')) {
+        syncScrollButtonVisibility()
+        return
+      }
+      if (suppressTranscriptResizeStickRef.current) {
+        syncScrollButtonVisibility()
+        return
+      }
       if (scrollIntentRef.current === 'force-bottom' || isNearBottom(sr)) {
         sr.scrollTo({ top: sr.scrollHeight, behavior: 'auto' })
         setShowScrollButton(false)
@@ -601,7 +632,9 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       const current = threadRunStatesRef.current[threadId]
       if (current && current.requestId !== requestId && !isPendingRequestId(current.requestId)) return
       if (current?.requestId === requestId && current.status === status) return
-      setThreadRunState(threadId, { requestId, status, updatedAt: Date.now() })
+      const startedAt = current?.startedAt ?? requestStartedAtRef.current.get(requestId) ?? Date.now()
+      requestStartedAtRef.current.set(requestId, startedAt)
+      setThreadRunState(threadId, { requestId, status, startedAt, updatedAt: Date.now() })
     },
     [setThreadRunState],
   )
@@ -621,6 +654,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       finishedRequestIdsRef.current.add(requestId)
       window.setTimeout(() => finishedRequestIdsRef.current.delete(requestId), 30_000)
       requestAssistantMessageIdsRef.current.delete(requestId)
+      requestStartedAtRef.current.delete(requestId)
       requestThreadIdsRef.current.delete(requestId)
       setPendingUserInputPrompts((prev) => prev.filter((item) => item.requestId !== requestId))
 
@@ -659,12 +693,13 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         markRequestRunning(eventThreadId, event.requestId)
         setThreadChatState(eventThreadId, (prev) => {
           const messageId = event.messageId
+          const startedAt = requestStartedAtRef.current.get(event.requestId) ?? Date.now()
           let { items } = prev
           const idx = items.findIndex((it) => it.type === 'message' && it.id === messageId)
           if (idx >= 0) {
             const it = items[idx] as ChatMessageItem
             const next = [...items]
-            next[idx] = { ...it, content: it.content + event.text, status: 'streaming' }
+            next[idx] = { ...it, content: it.content + event.text, status: 'streaming', startedAt: it.startedAt ?? startedAt }
             requestAssistantMessageIdsRef.current.set(event.requestId, messageId)
             return { ...prev, items: next }
           }
@@ -674,7 +709,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
           if (pIdx >= 0) {
             const it = items[pIdx] as ChatMessageItem
             const next = [...items]
-            next[pIdx] = { ...it, id: messageId, content: it.content + event.text, status: 'streaming' }
+            next[pIdx] = { ...it, id: messageId, content: it.content + event.text, status: 'streaming', startedAt: it.startedAt ?? startedAt }
             requestAssistantMessageIdsRef.current.set(event.requestId, messageId)
             return { ...prev, items: next }
           }
@@ -690,6 +725,8 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
             role: 'assistant',
             content: event.text,
             status: 'streaming',
+            createdAt: startedAt,
+            startedAt,
           }
           requestAssistantMessageIdsRef.current.set(event.requestId, messageId)
           return { ...prev, items: [...items, msg] }
@@ -891,6 +928,8 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       }
 
       if (event.type === 'result') {
+        const completedAt = Date.now()
+        const requestStartedAt = requestStartedAtRef.current.get(event.requestId) ?? completedAt
         flushSync(() => {
           setThreadChatState(eventThreadId, (prev) => {
             const expectedId = `assistant-${event.requestId}`
@@ -902,7 +941,15 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
               found = true
               const content =
                 !item.content.trim() && event.result.trim() ? event.result : item.content
-              return { ...item, content, status: 'done' }
+              const startedAt = item.startedAt ?? requestStartedAt
+              return {
+                ...item,
+                content,
+                status: 'done',
+                startedAt,
+                completedAt,
+                durationMs: Math.max(0, completedAt - startedAt),
+              }
             })
             const items: TranscriptItem[] =
               found || !event.result.trim()
@@ -915,6 +962,10 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                       role: 'assistant',
                       content: event.result,
                       status: 'done',
+                      createdAt: requestStartedAt,
+                      startedAt: requestStartedAt,
+                      completedAt,
+                      durationMs: Math.max(0, completedAt - requestStartedAt),
                     },
                   ]
             return { ...prev, sessionId: event.sessionId, items }
@@ -925,6 +976,8 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       }
 
       if (event.type === 'error') {
+        const completedAt = Date.now()
+        const requestStartedAt = requestStartedAtRef.current.get(event.requestId) ?? completedAt
         if (activeThreadIdRef.current === eventThreadId) scrollIntentRef.current = 'force-bottom'
         const expectedId = `assistant-${event.requestId}`
         flushSync(() => {
@@ -936,7 +989,15 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
               if (item.id !== expectedId && item.id !== pendingId) return item
               found = true
               const content = !item.content.trim() ? event.message : item.content
-              return { ...item, content, status: 'error' }
+              const startedAt = item.startedAt ?? requestStartedAt
+              return {
+                ...item,
+                content,
+                status: 'error',
+                startedAt,
+                completedAt,
+                durationMs: Math.max(0, completedAt - startedAt),
+              }
             })
             const itemsOut: TranscriptItem[] = found
               ? mapped
@@ -948,6 +1009,10 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                     role: 'assistant',
                     content: event.message,
                     status: 'error',
+                    createdAt: requestStartedAt,
+                    startedAt: requestStartedAt,
+                    completedAt,
+                    durationMs: Math.max(0, completedAt - requestStartedAt),
                   },
                 ]
             return { ...prev, items: itemsOut }
@@ -963,6 +1028,8 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       }
 
       if (event.type === 'cancelled') {
+        const completedAt = Date.now()
+        const requestStartedAt = requestStartedAtRef.current.get(event.requestId) ?? completedAt
         if (activeThreadIdRef.current === eventThreadId) scrollIntentRef.current = 'force-bottom'
         const expectedId = `assistant-${event.requestId}`
         flushSync(() => {
@@ -974,7 +1041,15 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
               if (item.id !== expectedId && item.id !== pendingId) return item
               found = true
               const content = !item.content.trim() ? t('chat.stoppedBody') : item.content
-              return { ...item, content, status: 'cancelled' }
+              const startedAt = item.startedAt ?? requestStartedAt
+              return {
+                ...item,
+                content,
+                status: 'cancelled',
+                startedAt,
+                completedAt,
+                durationMs: Math.max(0, completedAt - startedAt),
+              }
             })
             const items: TranscriptItem[] = found
               ? mapped
@@ -986,6 +1061,10 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
                     role: 'assistant',
                     content: t('chat.stoppedBody'),
                     status: 'cancelled',
+                    createdAt: requestStartedAt,
+                    startedAt: requestStartedAt,
+                    completedAt,
+                    durationMs: Math.max(0, completedAt - requestStartedAt),
                   },
                 ]
             return { ...prev, items }
@@ -1028,7 +1107,10 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     }
     if (threadRunStatesRef.current[submittingThreadId]) return
 
-    const resumeSessionId = threads.find((th) => th.id === submittingThreadId)?.chatState.sessionId
+    const requestStartedAt = Date.now()
+    const resumeSessionId = target?.resetSession
+      ? undefined
+      : threads.find((th) => th.id === submittingThreadId)?.chatState.sessionId
 
     const userMessage: ChatMessageItem = {
       type: 'message',
@@ -1036,19 +1118,29 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       role: 'user',
       content: text,
       status: 'done',
+      createdAt: requestStartedAt,
+      completedAt: requestStartedAt,
       attachments: attachmentsForSubmit.map(toChatMessageAttachment),
     }
 
     if (activeThreadIdRef.current === submittingThreadId) scrollIntentRef.current = 'force-bottom'
     onThreadPromptSubmit(submittingThreadId, text)
-    setThreadChatState(submittingThreadId, (prev) => ({
-      ...prev,
-      items: [...prev.items, userMessage],
-    }))
+    if (!target?.reuseUserMessageId) {
+      setThreadChatState(submittingThreadId, (prev) => ({
+        ...prev,
+        items: [...prev.items, userMessage],
+      }))
+    }
     setInputValue('')
     if (!target?.threadId) setPendingAttachments([])
     const pendingRequestId = `pending-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-    setThreadRunState(submittingThreadId, { requestId: pendingRequestId, status: 'running', updatedAt: Date.now() })
+    requestStartedAtRef.current.set(pendingRequestId, requestStartedAt)
+    setThreadRunState(submittingThreadId, {
+      requestId: pendingRequestId,
+      status: 'running',
+      startedAt: requestStartedAt,
+      updatedAt: Date.now(),
+    })
     onStatusChange(t('chat.statusProcessing'))
 
     if (!window.claudeChat) {
@@ -1063,6 +1155,10 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
             role: 'assistant',
             content: t('chat.bridgeErrorBody'),
             status: 'error',
+            createdAt: requestStartedAt,
+            startedAt: requestStartedAt,
+            completedAt: Date.now(),
+            durationMs: Math.max(0, Date.now() - requestStartedAt),
           },
         ],
       }))
@@ -1083,16 +1179,21 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       if (finishedRequestIdsRef.current.delete(requestId)) {
         requestThreadIdsRef.current.delete(requestId)
         requestAssistantMessageIdsRef.current.delete(requestId)
+        requestStartedAtRef.current.delete(requestId)
+        requestStartedAtRef.current.delete(pendingRequestId)
         const current = threadRunStatesRef.current[submittingThreadId] as ThreadRunState | undefined
         if (current && (current.requestId === requestId || current.requestId === pendingRequestId)) {
           setThreadRunState(submittingThreadId, null)
         }
         return
       }
+      requestStartedAtRef.current.delete(pendingRequestId)
+      requestStartedAtRef.current.set(requestId, requestStartedAt)
       requestThreadIdsRef.current.set(requestId, submittingThreadId)
       requestAssistantMessageIdsRef.current.set(requestId, `assistant-${requestId}`)
-      setThreadRunState(submittingThreadId, { requestId, status: 'running', updatedAt: Date.now() })
+      setThreadRunState(submittingThreadId, { requestId, status: 'running', startedAt: requestStartedAt, updatedAt: Date.now() })
     } catch (error) {
+      requestStartedAtRef.current.delete(pendingRequestId)
       if (activeThreadIdRef.current === submittingThreadId) scrollIntentRef.current = 'force-bottom'
       setThreadChatState(submittingThreadId, (prev) => ({
         ...prev,
@@ -1104,12 +1205,70 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
             role: 'assistant',
             content: error instanceof Error ? error.message : String(error),
             status: 'error',
+            createdAt: requestStartedAt,
+            startedAt: requestStartedAt,
+            completedAt: Date.now(),
+            durationMs: Math.max(0, Date.now() - requestStartedAt),
           },
         ],
       }))
       setThreadRunState(submittingThreadId, null)
       onStatusChange(t('chat.sendFailedStatus'))
     }
+  }
+
+  const copyMessage = useCallback(
+    async (text: string) => {
+      const ok = await writeClipboardText(text)
+      onStatusChange(ok ? t('chat.copiedMessage') : t('chat.copyFailed'))
+    },
+    [onStatusChange, t],
+  )
+
+  const editUserMessage = (messageId: string, text: string) => {
+    if (isRunningRef.current) return
+    const nextText = text.trim()
+    if (!nextText) return
+
+    const threadId = activeThreadIdRef.current
+    if (!threadId) return
+
+    const projectForSubmit =
+      activeThread ? projects.find((project) => project.id === activeThread.projectId) ?? activeProject : activeProject
+
+    const currentItems = threads.find((thread) => thread.id === threadId)?.chatState.items ?? activeThread?.chatState.items ?? []
+    if (!currentItems.some((item) => item.type === 'message' && item.role === 'user' && item.id === messageId)) return
+
+    const editedAt = Date.now()
+    setThreadChatState(threadId, (prev) => {
+      const idx = prev.items.findIndex((item) => item.type === 'message' && item.role === 'user' && item.id === messageId)
+      if (idx < 0) return prev
+      const item = prev.items[idx] as ChatMessageItem
+      const nextItems = prev.items.slice(0, idx + 1)
+      nextItems[idx] = {
+        ...item,
+        content: nextText,
+        status: 'done',
+        createdAt: item.createdAt ?? editedAt,
+        completedAt: editedAt,
+      }
+      return {
+        ...prev,
+        sessionId: undefined,
+        items: nextItems,
+      }
+    })
+
+    scrollIntentRef.current = 'force-bottom'
+    void (async () => {
+      await window.claudeChat?.newThread(threadId)
+      await submitPrompt(nextText, {
+        threadId,
+        project: projectForSubmit,
+        reuseUserMessageId: messageId,
+        resetSession: true,
+      })
+    })()
   }
 
   useImperativeHandle(
@@ -1375,10 +1534,14 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
       {hasMessages ? (
         <ChatThreadView
           items={chatItems}
+          isRunning={isRunning}
           composer={composer}
           scrollRegionRef={scrollRegionRef}
           showScrollButton={showScrollButton}
           onScrollToBottom={scrollToBottom}
+          onCopyMessage={(text) => void copyMessage(text)}
+          onEditUserMessage={editUserMessage}
+          onUserMessageEditDismissed={notifyUserMessageEditDismissed}
           onReviewFileChanges={reviewFileChanges}
           onRewindFileChanges={rewindFileChanges}
         />
@@ -1569,6 +1732,30 @@ function formatContextSource(source: AgentContextSource): string {
 function readStoredPermissionMode(): ClaudePermissionMode {
   const stored = window.localStorage.getItem(PERMISSION_MODE_STORAGE_KEY)
   return isClaudePermissionMode(stored) ? stored : 'auto'
+}
+
+async function writeClipboardText(text: string): Promise<boolean> {
+  if (!text.trim()) return false
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.left = '-9999px'
+    textarea.style.top = '0'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+    try {
+      return document.execCommand('copy')
+    } catch {
+      return false
+    } finally {
+      textarea.remove()
+    }
+  }
 }
 
 function isClaudePermissionMode(value: unknown): value is ClaudePermissionMode {

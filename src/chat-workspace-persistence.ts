@@ -261,6 +261,10 @@ function normalizeTranscriptItem(value: unknown): ChatState['items'] {
           value.status === 'streaming' || value.status === 'error' || value.status === 'cancelled'
             ? value.status
             : 'done',
+        createdAt: toOptionalFiniteNumber(value.createdAt),
+        startedAt: toOptionalFiniteNumber(value.startedAt),
+        completedAt: toOptionalFiniteNumber(value.completedAt),
+        durationMs: toOptionalFiniteNumber(value.durationMs),
         attachments: normalizeMessageAttachments(value.attachments),
       },
     ]
