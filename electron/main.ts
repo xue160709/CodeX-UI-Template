@@ -482,6 +482,12 @@ if (gotSingleInstanceLock) {
       const resolved = resolveProjectPath(rawPath)
       shell.showItemInFolder(resolved)
     })
+    ipcMain.handle('desktop:open-path', async (_event, rawPath: unknown) => {
+      if (typeof rawPath !== 'string' || !rawPath.trim()) return
+      const resolved = resolveProjectPath(rawPath)
+      const message = await shell.openPath(resolved)
+      if (message) throw new Error(message)
+    })
     createWindow()
     ensureTray()
   })

@@ -79,6 +79,8 @@ declare global {
       quitApp?: () => Promise<void>
       /** 在访达/资源管理器中展示路径 / Reveal path in Finder or Explorer */
       showItemInFolder?: (targetPath: string) => Promise<void>
+      /** 使用系统默认应用打开路径 / Open path with the system default app */
+      openPath?: (targetPath: string) => Promise<void>
       getDesktopPreferences?: () => Promise<DesktopPreferences>
       setDesktopPreferences?: (partial: Partial<DesktopPreferences>) => Promise<DesktopPreferences>
       syncTrayLocale?: (locale: 'zh' | 'en') => Promise<void>

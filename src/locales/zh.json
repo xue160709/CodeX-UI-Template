@@ -105,7 +105,8 @@
   },
   "thread": {
     "newThreadTitle": "新对话",
-    "homePluginCustomizationTitle": "定制Agent面板"
+    "homePluginCustomizationTitle": "定制Agent面板",
+    "homePluginCustomizationPrompt": "请重新扫描当前项目，基于当前文件和数据源重建定制 Agent 面板。先从用户视角判断首页最应该展示什么，再实现或更新 .agents/home-plugins/project-home/，加入必要的数据可视化和可打开源文件的二层交互，最后运行可用验证并修复问题。"
   },
   "project": {
     "promptNewName": "新项目名称",

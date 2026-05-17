@@ -70,6 +70,9 @@ contextBridge.exposeInMainWorld('desktop', {
   showItemInFolder(targetPath: string) {
     return ipcRenderer.invoke('desktop:show-item-in-folder', targetPath) as Promise<void>
   },
+  openPath(targetPath: string) {
+    return ipcRenderer.invoke('desktop:open-path', targetPath) as Promise<void>
+  },
   getDesktopPreferences() {
     return ipcRenderer.invoke('desktop-preferences:get') as Promise<DesktopPreferences>
   },

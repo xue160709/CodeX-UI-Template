@@ -12,7 +12,8 @@
   },
   "files": [
     "dist",
-    "dist-electron"
+    "dist-electron",
+    ".agents/skills/a2ui-project-home-panel"
   ],
   "mac": {
     "icon": "build/icons/icon.icns",

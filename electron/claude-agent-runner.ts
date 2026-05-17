@@ -65,6 +65,7 @@ type ActiveRequest = {
 
 const READ_ONLY_AUTO_ALLOWED_TOOLS = ['Read', 'Glob', 'Grep', 'ListMcpResources', 'ReadMcpResource']
 const DEFAULT_AGENT_TOOLS = { type: 'preset', preset: 'claude_code' } as const
+const HOME_PLUGIN_CUSTOMIZATION_SKILL = 'a2ui-project-home-panel'
 type PendingPermissionRequest = {
   requestId: string
   toolUseId: string
@@ -380,7 +381,10 @@ export class ClaudeAgentRunner {
         this.resolveUiLocale(),
       )
       const appendSystemPrompt = buildRequestAppendSystemPrompt(activeRequest, runtimeContext.appendSystemPrompt)
-      const resolvedPrompt = await resolvePromptWithContext(prompt, runtimeContext.catalog)
+      const resolvedPrompt = await resolvePromptWithContext(prompt, runtimeContext.catalog, {
+        forcedSkillCommand:
+          activeRequest.promptMode === 'home-plugin-customization' ? HOME_PLUGIN_CUSTOMIZATION_SKILL : undefined,
+      })
       const promptInput = buildSdkPromptInput(resolvedPrompt, attachments)
       const sdkEnv = buildSdkEnv(config)
       if (attachments.length > 0) {

@@ -7,6 +7,7 @@ import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type {
   AgentContextAgentItem,
   AgentContextCatalog,
@@ -153,28 +154,48 @@ export async function buildRuntimeContext(
 }
 
 /** 展开斜杠调用为内联指令块（若命中技能）/ Expand `/command` invocations using skill markdown when matched */
-export async function resolvePromptWithContext(prompt: string, catalog: AgentContextCatalog): Promise<string> {
+export async function resolvePromptWithContext(
+  prompt: string,
+  catalog: AgentContextCatalog,
+  options: { forcedSkillCommand?: string } = {},
+): Promise<string> {
+  const forcedSkillCommand = options.forcedSkillCommand?.trim()
   const invocation = parseSlashInvocation(prompt)
+  if (forcedSkillCommand && invocation?.command !== forcedSkillCommand) {
+    const forcedItem = findHostSkill(catalog, forcedSkillCommand)
+    if (forcedItem) return expandSkillInvocation(forcedItem, prompt, true)
+  }
   if (!invocation) return prompt
 
-  const item = catalog.skills.find(
-    (candidate) =>
-      !candidate.native &&
-      (candidate.command === invocation.command || candidate.name === invocation.command),
-  )
+  const item = findHostSkill(catalog, invocation.command)
   if (!item) return prompt
 
+  return expandSkillInvocation(item, invocation.argumentsText, false, invocation.command)
+}
+
+function findHostSkill(catalog: AgentContextCatalog, command: string): AgentContextSlashItem | undefined {
+  return catalog.skills.find((candidate) => !candidate.native && (candidate.command === command || candidate.name === command))
+}
+
+async function expandSkillInvocation(
+  item: AgentContextSlashItem,
+  argumentsText: string,
+  automatic: boolean,
+  commandName = item.command,
+): Promise<string> {
   const parsed = await readMarkdown(item.path)
-  const body = applySlashArguments(parsed.body.trim(), invocation.argumentsText)
+  const body = applySlashArguments(parsed.body.trim(), argumentsText)
   return [
-    `The user invoked the host-compatible slash command /${item.command}.`,
+    automatic
+      ? `The host automatically invoked the host-compatible slash command /${item.command} for this request.`
+      : `The user invoked the host-compatible slash command /${commandName}.`,
     `Source: ${item.relativePath}`,
     '',
     '<slash_command_instructions>',
     body,
     '</slash_command_instructions>',
     '',
-    invocation.argumentsText ? `User arguments: ${invocation.argumentsText}` : 'User arguments: none',
+    argumentsText ? `User arguments: ${argumentsText}` : 'User arguments: none',
     '',
     'Carry out the slash command instructions for the user request above.',
   ].join('\n')
@@ -254,6 +275,7 @@ export async function searchProjectFiles(rootPath: string, query: string): Promi
 
 async function collectContextSourceRoots(projectRoot: string): Promise<ContextSourceRoot[]> {
   const roots: ContextSourceRoot[] = []
+  const projectAncestors = await collectProjectAncestors(projectRoot)
   for (const source of SOURCE_DIRECTORIES) {
     roots.push({
       directory: path.join(os.homedir(), source.directoryName),
@@ -263,7 +285,26 @@ async function collectContextSourceRoots(projectRoot: string): Promise<ContextSo
     })
   }
 
-  for (const directory of await collectProjectAncestors(projectRoot)) {
+  const bundledAgentsDirectories = [
+    path.join(process.cwd(), '.agents'),
+    path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), '.agents'),
+  ]
+  const seenBundledDirectories = new Set<string>()
+  for (const bundledAgentsDirectory of bundledAgentsDirectories) {
+    const bundledRoot = path.dirname(bundledAgentsDirectory)
+    if (projectAncestors.includes(bundledRoot) || seenBundledDirectories.has(bundledAgentsDirectory)) continue
+    seenBundledDirectories.add(bundledAgentsDirectory)
+    if (await exists(path.join(bundledAgentsDirectory, 'skills', 'a2ui-project-home-panel', 'SKILL.md'))) {
+      roots.push({
+        directory: bundledAgentsDirectory,
+        projectRoot,
+        scope: 'user',
+        source: 'agents',
+      })
+    }
+  }
+
+  for (const directory of projectAncestors) {
     for (const source of SOURCE_DIRECTORIES) {
       roots.push({
         directory: path.join(directory, source.directoryName),
@@ -322,8 +363,22 @@ async function readCommandItems(sourceRoot: ContextSourceRoot): Promise<AgentCon
 }
 
 async function readAgentItems(sourceRoot: ContextSourceRoot): Promise<AgentContextAgentItem[]> {
-  const agentFiles = await readMarkdownFiles(path.join(sourceRoot.directory, 'agents'))
+  const agentFiles = [
+    ...(await readMarkdownFiles(path.join(sourceRoot.directory, 'agents'))),
+    ...(await readSkillAgentFiles(sourceRoot)),
+  ]
   return Promise.all(agentFiles.map((agentPath) => createAgentItem(agentPath, sourceRoot)))
+}
+
+async function readSkillAgentFiles(sourceRoot: ContextSourceRoot): Promise<string[]> {
+  const skillsDirectory = path.join(sourceRoot.directory, 'skills')
+  const entries = await safeReadDir(skillsDirectory)
+  const files: string[] = []
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    files.push(...(await readMarkdownFiles(path.join(skillsDirectory, entry.name, 'agents'))))
+  }
+  return files
 }
 
 async function readInstructionFiles(

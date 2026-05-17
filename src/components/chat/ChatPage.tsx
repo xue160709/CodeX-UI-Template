@@ -24,6 +24,7 @@ import type {
   ClaudeAgentSettings,
   ClaudeAgentSettingsSnapshot,
   ClaudeChatEvent,
+  ClaudeChatSubmitPayload,
   ClaudePermissionMode,
   ProjectFileSearchItem,
 } from '../../claude-chat-types'
@@ -57,6 +58,12 @@ export type ChatPageHandle = {
   startNewThread: () => Promise<void>
   focusComposer: () => void
   submitPromptInNewThread: (projectId: string, prompt: string) => Promise<boolean>
+  submitPromptInThread: (
+    projectId: string,
+    threadId: string,
+    prompt: string,
+    promptMode?: ClaudeChatSubmitPayload['promptMode'],
+  ) => Promise<boolean>
 }
 
 type ChatPageProps = {
@@ -80,6 +87,7 @@ type ChatPageProps = {
 type SubmitPromptTarget = {
   threadId?: string
   project?: WorkspaceProject
+  promptMode?: ClaudeChatSubmitPayload['promptMode']
   reuseUserMessageId?: string
   resetSession?: boolean
 }
@@ -613,6 +621,16 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     sr.scrollTo({ top: sr.scrollHeight, behavior })
     setShowScrollButton(false)
   }, [])
+
+  const getActiveSubmitTarget = useCallback((): SubmitPromptTarget | undefined => {
+    if (!activeThread) return undefined
+    const projectForThread = projects.find((project) => project.id === activeThread.projectId) ?? activeProject
+    return {
+      threadId: activeThread.id,
+      project: projectForThread,
+      promptMode: activeThread.purpose === 'home-plugin-customization' ? 'home-plugin-customization' : undefined,
+    }
+  }, [activeProject, activeThread, projects])
 
   const setThreadRunState = useCallback(
     (threadId: string, state: ThreadRunState | null) => {
@@ -1171,11 +1189,14 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
 
     try {
       const submittingThread = threads.find((thread) => thread.id === submittingThreadId)
+      const promptMode =
+        target?.promptMode ??
+        (submittingThread?.purpose === 'home-plugin-customization' ? 'home-plugin-customization' : undefined)
       const { requestId } = await window.claudeChat.submit({
         text,
         attachments: attachmentsForSubmit,
         threadId: submittingThreadId,
-        promptMode: submittingThread?.purpose === 'home-plugin-customization' ? 'home-plugin-customization' : undefined,
+        promptMode,
         sessionId: resumeSessionId,
         cwd: projectForSubmit.path,
         permissionMode,
@@ -1313,12 +1334,28 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         requestAnimationFrame(() => chatInputRef.current?.focus())
         return true
       },
+      submitPromptInThread: async (
+        projectId: string,
+        threadId: string,
+        prompt: string,
+        promptMode?: ClaudeChatSubmitPayload['promptMode'],
+      ) => {
+        const projectForSubmit = projects.find((project) => project.id === projectId)
+        if (!projectForSubmit) return false
+
+        activeThreadIdRef.current = threadId
+        isFirstTranscriptLayoutRef.current = true
+        scrollIntentRef.current = 'force-bottom'
+        await submitPrompt(prompt, { threadId, project: projectForSubmit, promptMode })
+        requestAnimationFrame(() => chatInputRef.current?.focus())
+        return true
+      },
     }),
     [onNewThread, onStatusChange, projects, setThreadRunState, t],
   )
 
   const cancelActiveRequest = async () => {
-    const requestId = threadRunStatesRef.current[activeThreadIdRef.current]?.requestId
+    const requestId = threadRunStatesRef.current[activeThread?.id ?? activeThreadIdRef.current]?.requestId
     if (!requestId || isPendingRequestId(requestId) || !window.claudeChat) return
     await window.claudeChat.cancel(requestId)
   }
@@ -1397,12 +1434,11 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
 
   const handleFormSubmit = (event: FormEvent) => {
     event.preventDefault()
-    if (isRunningRef.current) return
-    void submitPrompt(inputValue, undefined, pendingAttachments)
+    void submitPrompt(inputValue, getActiveSubmitTarget(), pendingAttachments)
   }
 
   const handleSendClick = (event: React.MouseEvent) => {
-    if (!isRunningRef.current) return
+    if (!isRunning) return
     event.preventDefault()
     void cancelActiveRequest()
   }
@@ -1433,7 +1469,7 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
 
     if (event.key !== 'Enter' || event.shiftKey || isComposingText) return
     event.preventDefault()
-    if (!isRunningRef.current) void submitPrompt(inputValue, undefined, pendingAttachments)
+    void submitPrompt(inputValue, getActiveSubmitTarget(), pendingAttachments)
   }
 
   const reviewFileChanges = useCallback(
@@ -1525,15 +1561,17 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     />
   )
 
+  const showThreadView = hasMessages || activeThread?.purpose === 'home-plugin-customization'
+
   return (
     <section
-      className={`chat-page${hasMessages ? ' has-messages' : ''}`}
+      className={`chat-page${showThreadView ? ' has-messages' : ''}`}
       id="panel-home"
       aria-label={t('chat.ariaPage')}
       hidden={hidden}
       aria-hidden={hidden}
     >
-      {hasMessages ? (
+      {showThreadView ? (
         <ChatThreadView
           items={chatItems}
           isRunning={isRunning}

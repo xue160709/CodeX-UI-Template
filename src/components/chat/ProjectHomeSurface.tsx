@@ -19,13 +19,23 @@ const messageCache = new Map<string, { outputHash: string; messages: A2uiMessage
 export function ProjectHomeSurface({ project, onCustomizeHome }: ProjectHomeSurfaceProps) {
   const outputHashRef = useRef<string>(messageCache.get(project.path)?.outputHash ?? '')
   const surfacesRef = useRef<SurfaceModel<ReactComponentImplementation>[]>([])
+  const projectPathRef = useRef(project.path)
+  const onCustomizeHomeRef = useRef(onCustomizeHome)
   const [surfaces, setSurfaces] = useState<SurfaceModel<ReactComponentImplementation>[]>([])
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    projectPathRef.current = project.path
+  }, [project.path])
+
+  useEffect(() => {
+    onCustomizeHomeRef.current = onCustomizeHome
+  }, [onCustomizeHome])
 
   const handleAction = useCallback(
     (action: A2uiClientAction) => {
       if (action.name === 'customize_home') {
-        onCustomizeHome()
+        onCustomizeHomeRef.current()
         return
       }
       if (action.name === 'refresh_home') {
@@ -36,11 +46,19 @@ export function ProjectHomeSurface({ project, onCustomizeHome }: ProjectHomeSurf
       if (action.name === 'open_file') {
         const rawPath = action.context?.path
         if (typeof rawPath === 'string' && rawPath.trim()) {
-          void window.desktop?.showItemInFolder?.(`${project.path}/${rawPath}`)
+          const safePath = normalizeProjectRelativePath(rawPath)
+          if (safePath) {
+            const targetPath = `${projectPathRef.current}/${safePath}`
+            if (window.desktop?.openPath) {
+              void window.desktop.openPath(targetPath).catch(() => window.desktop?.showItemInFolder?.(targetPath))
+            } else {
+              void window.desktop?.showItemInFolder?.(targetPath)
+            }
+          }
         }
       }
     },
-    [onCustomizeHome, project.path],
+    [],
   )
 
   const processor = useMemo(() => {
@@ -155,4 +173,10 @@ export function ProjectHomeSurface({ project, onCustomizeHome }: ProjectHomeSurf
       </div>
     </MarkdownContext.Provider>
   )
+}
+
+function normalizeProjectRelativePath(value: string): string {
+  const normalized = value.replace(/\\/g, '/').replace(/^\/+/, '').trim()
+  if (!normalized || normalized.split('/').some((segment) => segment === '..')) return ''
+  return normalized
 }
