@@ -61,7 +61,7 @@ export type ClaudeChatAttachmentPickerResult =
     }
 
 /** Claude Agent 权限模式 / Claude Agent permission mode */
-export type ClaudePermissionMode = 'plan' | 'auto' | 'default' | 'bypassPermissions'
+export type ClaudePermissionMode = 'plan' | 'auto' | 'default' | 'acceptEdits' | 'bypassPermissions'
 
 // --- User prompts & permission responses / 用户问答与权限应答 ---
 
@@ -261,6 +261,64 @@ export type ClaudeChatSubmitResult = {
 /** Agent 活动条的状态 / Status for inline agent activity rows */
 export type ClaudeChatActivityStatus = 'running' | 'done' | 'error' | 'info'
 
+// --- File diffs & rewind / 文件 diff 与回滚 ---
+
+/** 单行 diff 类型 / Single rendered diff line kind */
+export type ClaudeFileDiffLineKind = 'context' | 'add' | 'delete'
+
+/** 单行 diff，含旧/新文件行号 / Single diff line with old/new line numbers */
+export type ClaudeFileDiffLine = {
+  kind: ClaudeFileDiffLineKind
+  content: string
+  oldLineNumber?: number
+  newLineNumber?: number
+}
+
+/** 单个 diff hunk / Single diff hunk */
+export type ClaudeFileDiffHunk = {
+  oldStart: number
+  oldLines: number
+  newStart: number
+  newLines: number
+  lines: ClaudeFileDiffLine[]
+}
+
+/** 文件变更状态 / File change status */
+export type ClaudeFileDiffFileStatus = 'added' | 'modified' | 'deleted' | 'unknown'
+
+/** 单文件 diff 快照 / Single-file diff snapshot */
+export type ClaudeFileDiffFile = {
+  path: string
+  relativePath: string
+  status: ClaudeFileDiffFileStatus
+  additions: number
+  deletions: number
+  hunks: ClaudeFileDiffHunk[]
+  truncated?: boolean
+}
+
+/** 文件变更卡状态 / File change card status */
+export type ClaudeFileChangeSetStatus = 'captured' | 'reviewed' | 'reverted' | 'error'
+
+/** 请求回滚文件变更 / Request to rewind file changes */
+export type ClaudeFileRewindPayload = {
+  requestId?: string
+  threadId?: string
+  changeSetId?: string
+  checkpointId: string
+  cwd?: string
+}
+
+/** 回滚文件变更的结果 / Result of rewinding file changes */
+export type ClaudeFileRewindResult = {
+  ok: boolean
+  changeSetId?: string
+  message?: string
+  filesChanged?: string[]
+  insertions?: number
+  deletions?: number
+}
+
 // --- Streaming events & API surface / 流式事件与 API ---
 
 /** 单条聊天事件（含可选线程归属）/ Single streamed chat event with optional thread id */
@@ -357,6 +415,20 @@ export type ClaudeChatEventBase =
       preview?: string
     }
   | {
+      type: 'file_diff'
+      requestId: string
+      changeSetId: string
+      checkpointId?: string
+      files: ClaudeFileDiffFile[]
+    }
+  | {
+      type: 'file_rewind_result'
+      requestId: string
+      changeSetId?: string
+      status: 'reverted' | 'error'
+      detail?: string
+    }
+  | {
       type: 'result'
       requestId: string
       sessionId: string
@@ -384,6 +456,7 @@ export type ClaudeChatAPI = {
   cancel(requestId?: string): Promise<void>
   newThread(threadId?: string): Promise<void>
   answerPermissionRequest(payload: ClaudePermissionResponsePayload): Promise<void>
+  rewindFiles(payload: ClaudeFileRewindPayload): Promise<ClaudeFileRewindResult>
   getSettings(): Promise<ClaudeAgentSettingsSnapshot>
   saveSettings(settings: ClaudeAgentSettings): Promise<ClaudeAgentSettingsSnapshot>
   setActiveChatPick(payload: ActiveChatPickPayload): Promise<ClaudeAgentSettingsSnapshot>

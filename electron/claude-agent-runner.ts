@@ -6,6 +6,8 @@ import {
   type PermissionMode,
   type PermissionResult,
   type Query,
+  type RewindFilesResult,
+  type SDKMessage,
 } from '@anthropic-ai/claude-agent-sdk'
 import type {
   ClaudeAskUserQuestion,
@@ -14,6 +16,8 @@ import type {
   ClaudeChatEvent,
   ClaudeChatSubmitPayload,
   ClaudeChatSubmitResult,
+  ClaudeFileRewindPayload,
+  ClaudeFileRewindResult,
   ClaudePermissionMode,
   ClaudePermissionResponsePayload,
 } from '../src/claude-chat-types'
@@ -27,6 +31,7 @@ import {
   summarizeSdkEnvForLog,
 } from './claude-agent-runner/config'
 import { ClaudeChatEventCoalescer } from './claude-agent-runner/event-coalescer'
+import { fileDiffFromPostToolUse } from './claude-agent-runner/file-diff'
 import { buildSdkPromptInput, normalizeSubmitAttachments, resolveWorkspaceCwd } from './claude-agent-runner/input'
 import { ClaudeSdkMessageRouter } from './claude-agent-runner/sdk-message-router'
 
@@ -48,6 +53,7 @@ type ActiveRequest = {
   cancelled: boolean
   didEmitText: boolean
   didEmitThinking: boolean
+  checkpointId?: string
   permissionMode: ClaudePermissionMode
   seenToolUseIds: Set<string>
   streamBlocks: Map<number, StreamBlockState>
@@ -69,6 +75,7 @@ type ThreadRuntimeState = {
   sessionId?: string
   model: string
   configSignature?: string
+  cwd?: string
 }
 
 type StreamBlockState = {
@@ -227,6 +234,100 @@ export class ClaudeAgentRunner {
     })
   }
 
+  /** 回滚到本轮开始前的 SDK 文件 checkpoint / Rewind SDK-tracked file changes to a checkpoint */
+  async rewindFiles(payload: ClaudeFileRewindPayload): Promise<ClaudeFileRewindResult> {
+    const checkpointId = payload.checkpointId.trim()
+    const requestId = payload.requestId?.trim() || `rewind-${randomUUID()}`
+    const threadId = this.normalizeThreadId(payload.threadId)
+    if (!checkpointId) {
+      const result: ClaudeFileRewindResult = {
+        ok: false,
+        changeSetId: payload.changeSetId,
+        message: '缺少可回滚的文件快照。',
+      }
+      this.emitFileRewindResult(requestId, threadId, result)
+      return result
+    }
+
+    const activeRequest = payload.requestId ? this.activeRequests.get(payload.requestId) : undefined
+    if (activeRequest?.query) {
+      try {
+        const result = toClaudeFileRewindResult(await activeRequest.query.rewindFiles(checkpointId), payload.changeSetId)
+        this.emitFileRewindResult(activeRequest.requestId, activeRequest.threadId, result)
+        return result
+      } catch (error) {
+        const result = toFailedRewindResult(error, payload.changeSetId)
+        this.emitFileRewindResult(activeRequest.requestId, activeRequest.threadId, result)
+        return result
+      }
+    }
+
+    const config = this.resolveConfig()
+    if (!config.apiKey && !config.authToken) {
+      const result: ClaudeFileRewindResult = {
+        ok: false,
+        changeSetId: payload.changeSetId,
+        message: '缺少 Claude 凭据，无法恢复 SDK 会话执行回滚。',
+      }
+      this.emitFileRewindResult(requestId, threadId, result)
+      return result
+    }
+
+    const threadState = this.getThreadRuntimeState(threadId)
+    if (!threadState.sessionId) {
+      const result: ClaudeFileRewindResult = {
+        ok: false,
+        changeSetId: payload.changeSetId,
+        message: '没有可恢复的 Claude 会话，无法回滚文件。',
+      }
+      this.emitFileRewindResult(requestId, threadId, result)
+      return result
+    }
+
+    const abortController = new AbortController()
+    const timeout = setTimeout(() => abortController.abort(), 30_000)
+    const cwd = resolveWorkspaceCwd(payload.cwd ?? threadState.cwd, this.cwd)
+    let response: Query | undefined
+
+    try {
+      response = query({
+        prompt: '',
+        options: {
+          abortController,
+          cwd,
+          enableFileCheckpointing: true,
+          env: buildSdkEnv(config),
+          extraArgs: { 'replay-user-messages': null },
+          permissionMode: 'default',
+          resume: threadState.sessionId,
+          settingSources: [],
+          tools: DEFAULT_AGENT_TOOLS,
+        },
+      })
+
+      for await (const _message of response) {
+        const result = toClaudeFileRewindResult(await response.rewindFiles(checkpointId), payload.changeSetId)
+        this.emitFileRewindResult(requestId, threadId, result)
+        return result
+      }
+
+      const result: ClaudeFileRewindResult = {
+        ok: false,
+        changeSetId: payload.changeSetId,
+        message: 'Claude 会话未返回可用于回滚的连接。',
+      }
+      this.emitFileRewindResult(requestId, threadId, result)
+      return result
+    } catch (error) {
+      const result = toFailedRewindResult(error, payload.changeSetId)
+      this.emitFileRewindResult(requestId, threadId, result)
+      return result
+    } finally {
+      clearTimeout(timeout)
+      response?.close()
+    }
+  }
+
   // --- SDK query lifecycle / SDK 查询生命周期 ---
 
   private async run(prompt: string, attachments: ClaudeChatAttachment[], activeRequest: ActiveRequest): Promise<void> {
@@ -237,6 +338,7 @@ export class ClaudeAgentRunner {
       threadState.sessionId = undefined
     }
     threadState.configSignature = nextConfigSignature
+    threadState.cwd = activeRequest.cwd
 
     if (!config.apiKey && !config.authToken) {
       this.emit({
@@ -305,9 +407,18 @@ export class ClaudeAgentRunner {
           allowedTools: READ_ONLY_AUTO_ALLOWED_TOOLS,
           canUseTool: (toolName, input, options) => this.handleCanUseTool(activeRequest, toolName, input, options),
           cwd: activeRequest.cwd,
+          enableFileCheckpointing: true,
           env: sdkEnv,
+          extraArgs: { 'replay-user-messages': null },
           forwardSubagentText: true,
-          includeHookEvents: true,
+          hooks: {
+            PostToolUse: [
+              {
+                hooks: [async (input) => this.handlePostToolUseHook(activeRequest, input)],
+              },
+            ],
+          },
+          includeHookEvents: false,
           includePartialMessages: true,
           // Third-party Anthropic-compatible endpoints such as SiliconFlow expect
           // custom models through ANTHROPIC_MODEL. Passing options.model makes
@@ -334,6 +445,7 @@ export class ClaudeAgentRunner {
 
       for await (const message of response) {
         if (activeRequest.cancelled) break
+        this.captureCheckpointFromSdkMessage(message, activeRequest)
         this.messageRouter.handleSdkMessage(message, activeRequest)
       }
     } catch (error) {
@@ -362,6 +474,37 @@ export class ClaudeAgentRunner {
     if (this.activeRequestIdsByThread.get(activeRequest.threadId) === activeRequest.requestId) {
       this.activeRequestIdsByThread.delete(activeRequest.threadId)
     }
+  }
+
+  private captureCheckpointFromSdkMessage(message: SDKMessage, activeRequest: ActiveRequest): void {
+    const record = message as unknown
+    if (!isRecord(record) || record.type !== 'user') return
+    if (activeRequest.checkpointId || typeof record.uuid !== 'string') return
+    if (record.parent_tool_use_id !== null && record.parent_tool_use_id !== undefined) return
+
+    activeRequest.checkpointId = record.uuid
+    this.emitActivity(activeRequest, 'file-checkpoint', '文件快照已创建', 'done', '可用于撤销本轮文件改动')
+  }
+
+  private async handlePostToolUseHook(activeRequest: ActiveRequest, input: unknown): Promise<{ continue: true; suppressOutput: true }> {
+    try {
+      const file = fileDiffFromPostToolUse(input, activeRequest.cwd)
+      if (file) {
+        this.emit({
+          type: 'file_diff',
+          requestId: activeRequest.requestId,
+          changeSetId: `file-diff-${activeRequest.requestId}`,
+          checkpointId: activeRequest.checkpointId,
+          files: [file],
+        })
+      }
+    } catch (error) {
+      console.warn('[ClaudeAgentRunner] failed to collect file diff', {
+        requestId: activeRequest.requestId,
+        error: summarizeErrorForLog(error),
+      })
+    }
+    return { continue: true, suppressOutput: true }
   }
 
   // --- Tool permission gating / 工具权限闸门 ---
@@ -489,6 +632,17 @@ export class ClaudeAgentRunner {
     this.webContents.send(CLAUDE_CHAT_EVENT_CHANNEL, event)
   }
 
+  private emitFileRewindResult(requestId: string, threadId: string, result: ClaudeFileRewindResult): void {
+    this.emit({
+      type: 'file_rewind_result',
+      requestId,
+      threadId,
+      changeSetId: result.changeSetId,
+      status: result.ok ? 'reverted' : 'error',
+      detail: result.message,
+    })
+  }
+
   private normalizeThreadId(threadId?: string): string {
     const trimmed = threadId?.trim()
     return trimmed || this.defaultThreadId
@@ -531,12 +685,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function normalizeChatPermissionMode(value: ClaudePermissionMode | undefined): ClaudePermissionMode {
-  if (value === 'plan' || value === 'default' || value === 'bypassPermissions') return value
+  if (value === 'plan' || value === 'default' || value === 'acceptEdits' || value === 'bypassPermissions') return value
   return 'auto'
 }
 
 function toSdkPermissionMode(value: ClaudePermissionMode): PermissionMode {
   return value
+}
+
+function toClaudeFileRewindResult(result: RewindFilesResult, changeSetId: string | undefined): ClaudeFileRewindResult {
+  return {
+    ok: result.canRewind,
+    changeSetId,
+    message: result.error || (result.canRewind ? '文件改动已撤销。' : '无法撤销文件改动。'),
+    filesChanged: result.filesChanged,
+    insertions: result.insertions,
+    deletions: result.deletions,
+  }
+}
+
+function toFailedRewindResult(error: unknown, changeSetId: string | undefined): ClaudeFileRewindResult {
+  return {
+    ok: false,
+    changeSetId,
+    message: error instanceof Error ? error.message : String(error),
+  }
 }
 
 function normalizeAskUserQuestions(input: Record<string, unknown>): ClaudeAskUserQuestion[] {

@@ -10,6 +10,7 @@ import type {
   ClaudeAgentSettings,
   ClaudeChatEvent,
   ClaudeChatEventHandler,
+  ClaudeFileRewindPayload,
   ClaudePermissionResponsePayload,
   ClaudeChatSubmitPayload,
 } from '../src/claude-chat-types'
@@ -123,6 +124,9 @@ contextBridge.exposeInMainWorld('claudeChat', {
   },
   answerPermissionRequest(payload: ClaudePermissionResponsePayload) {
     return ipcRenderer.invoke('claude-chat:answer-permission-request', payload)
+  },
+  rewindFiles(payload: ClaudeFileRewindPayload) {
+    return ipcRenderer.invoke('claude-chat:rewind-files', payload)
   },
   getSettings() {
     return ipcRenderer.invoke('claude-agent-settings:get')

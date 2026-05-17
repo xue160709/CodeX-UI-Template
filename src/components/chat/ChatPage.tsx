@@ -30,6 +30,7 @@ import type {
 import { useI18n } from '../../i18n/i18n'
 import type {
   ChatActivityItem,
+  ChatFileDiffItem,
   ChatMessageAttachment,
   ChatMessageItem,
   ChatState,
@@ -845,6 +846,50 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
         return
       }
 
+      if (event.type === 'file_diff') {
+        markRequestRunning(eventThreadId, event.requestId)
+        setThreadChatState(eventThreadId, (prev) => {
+          const idx = prev.items.findIndex((it) => it.type === 'file_diff' && it.changeSetId === event.changeSetId)
+          if (idx >= 0) {
+            const next = [...prev.items]
+            const it = next[idx] as ChatFileDiffItem
+            next[idx] = {
+              ...it,
+              checkpointId: event.checkpointId ?? it.checkpointId,
+              files: mergeDiffFiles(it.files, event.files),
+              status: it.status === 'reverted' ? it.status : 'captured',
+              detail: undefined,
+            }
+            return { ...prev, items: next }
+          }
+          const row: ChatFileDiffItem = {
+            type: 'file_diff',
+            id: event.changeSetId,
+            requestId: event.requestId,
+            changeSetId: event.changeSetId,
+            checkpointId: event.checkpointId,
+            files: event.files,
+            status: 'captured',
+          }
+          return { ...prev, items: [...prev.items, row] }
+        })
+        return
+      }
+
+      if (event.type === 'file_rewind_result') {
+        setThreadChatState(eventThreadId, (prev) => {
+          const idx = prev.items.findIndex(
+            (it) => it.type === 'file_diff' && (!event.changeSetId || it.changeSetId === event.changeSetId),
+          )
+          if (idx < 0) return prev
+          const next = [...prev.items]
+          const it = next[idx] as ChatFileDiffItem
+          next[idx] = { ...it, status: event.status === 'reverted' ? 'reverted' : 'error', detail: event.detail ?? it.detail }
+          return { ...prev, items: next }
+        })
+        return
+      }
+
       if (event.type === 'result') {
         flushSync(() => {
           setThreadChatState(eventThreadId, (prev) => {
@@ -1218,6 +1263,44 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     if (!isRunningRef.current) void submitPrompt(inputValue, undefined, pendingAttachments)
   }
 
+  const reviewFileChanges = useCallback(
+    (changeSetId: string) => {
+      const threadId = activeThreadIdRef.current
+      setThreadChatState(threadId, (prev) => {
+        const idx = prev.items.findIndex((it) => it.type === 'file_diff' && it.changeSetId === changeSetId)
+        if (idx < 0) return prev
+        const next = [...prev.items]
+        const it = next[idx] as ChatFileDiffItem
+        next[idx] = { ...it, status: 'reviewed', detail: undefined }
+        return { ...prev, items: next }
+      })
+    },
+    [setThreadChatState],
+  )
+
+  const rewindFileChanges = useCallback(
+    async (item: ChatFileDiffItem) => {
+      const threadId = activeThreadIdRef.current
+      if (!item.checkpointId || !window.claudeChat?.rewindFiles) {
+        setThreadChatState(threadId, (prev) => updateFileDiffStatus(prev, item.changeSetId, 'error', t('chat.fileDiffUnavailable')))
+        return
+      }
+
+      setThreadChatState(threadId, (prev) => updateFileDiffStatus(prev, item.changeSetId, 'captured', t('chat.fileDiffReverting')))
+      const result = await window.claudeChat.rewindFiles({
+        threadId,
+        requestId: item.requestId,
+        changeSetId: item.changeSetId,
+        checkpointId: item.checkpointId,
+        cwd: activeProject.path,
+      })
+      if (!result.ok) {
+        setThreadChatState(threadId, (prev) => updateFileDiffStatus(prev, item.changeSetId, 'error', result.message || t('chat.fileDiffUnavailable')))
+      }
+    },
+    [activeProject.path, setThreadChatState, t],
+  )
+
   const useStartSuggestion = useCallback((prompt: string) => {
     setInputValue(prompt)
     setComposerSelection({ start: prompt.length, end: prompt.length })
@@ -1296,6 +1379,8 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
           scrollRegionRef={scrollRegionRef}
           showScrollButton={showScrollButton}
           onScrollToBottom={scrollToBottom}
+          onReviewFileChanges={reviewFileChanges}
+          onRewindFileChanges={rewindFileChanges}
         />
       ) : (
         <ChatStartView project={activeProject} composer={composer} onUseSuggestion={useStartSuggestion} />
@@ -1435,6 +1520,41 @@ function toChatMessageAttachment(attachment: ClaudeChatAttachment): ChatMessageA
   }
 }
 
+function mergeDiffFiles(existing: ChatFileDiffItem['files'], incoming: ChatFileDiffItem['files']): ChatFileDiffItem['files'] {
+  const next = [...existing]
+  for (const file of incoming) {
+    const idx = next.findIndex((candidate) => candidate.path === file.path)
+    if (idx < 0) {
+      next.push(file)
+      continue
+    }
+    const previous = next[idx]
+    next[idx] = {
+      ...previous,
+      status: previous.status === 'added' ? previous.status : file.status,
+      additions: previous.additions + file.additions,
+      deletions: previous.deletions + file.deletions,
+      hunks: [...previous.hunks, ...file.hunks],
+      truncated: previous.truncated || file.truncated || undefined,
+    }
+  }
+  return next
+}
+
+function updateFileDiffStatus(
+  state: ChatState,
+  changeSetId: string,
+  status: ChatFileDiffItem['status'],
+  detail?: string,
+): ChatState {
+  const idx = state.items.findIndex((it) => it.type === 'file_diff' && it.changeSetId === changeSetId)
+  if (idx < 0) return state
+  const next = [...state.items]
+  const it = next[idx] as ChatFileDiffItem
+  next[idx] = { ...it, status, detail }
+  return { ...state, items: next }
+}
+
 function formatContextScope(scope: 'user' | 'project', t: (path: string, vars?: Record<string, string | number>) => string): string {
   return scope === 'user' ? t('chat.scopeUser') : t('chat.scopeProject')
 }
@@ -1452,7 +1572,7 @@ function readStoredPermissionMode(): ClaudePermissionMode {
 }
 
 function isClaudePermissionMode(value: unknown): value is ClaudePermissionMode {
-  return value === 'plan' || value === 'auto' || value === 'default' || value === 'bypassPermissions'
+  return value === 'plan' || value === 'auto' || value === 'default' || value === 'acceptEdits' || value === 'bypassPermissions'
 }
 
 function getPermissionModeRows(t: (path: string, vars?: Record<string, string | number>) => string): PermissionModeRow[] {
@@ -1466,6 +1586,11 @@ function getPermissionModeRows(t: (path: string, vars?: Record<string, string | 
       mode: 'auto',
       label: t('chat.permissionModeAuto'),
       description: t('chat.permissionModeAutoDesc'),
+    },
+    {
+      mode: 'acceptEdits',
+      label: t('chat.permissionModeAcceptEdits'),
+      description: t('chat.permissionModeAcceptEditsDesc'),
     },
     {
       mode: 'plan',

@@ -21,6 +21,7 @@ import type {
   ClaudeChatAttachmentPickerResult,
   ClaudeAgentSettings,
   ClaudeChatSubmitPayload,
+  ClaudeFileRewindPayload,
   ClaudePermissionResponsePayload,
 } from '../src/claude-chat-types'
 import type { FileTreeNode, FileTreeResult } from '../src/components/types'
@@ -391,6 +392,9 @@ if (gotSingleInstanceLock) {
     })
     ipcMain.handle('claude-chat:answer-permission-request', (_event, payload: ClaudePermissionResponsePayload) => {
       return getClaudeAgentRunner().answerPermissionRequest(payload)
+    })
+    ipcMain.handle('claude-chat:rewind-files', (_event, payload: ClaudeFileRewindPayload) => {
+      return getClaudeAgentRunner().rewindFiles(payload)
     })
     ipcMain.handle('claude-agent-settings:get', () => {
       return getClaudeAgentSettingsStore().getSnapshot()

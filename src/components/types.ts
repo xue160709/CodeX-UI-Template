@@ -3,7 +3,12 @@
  * UI-side types for app shell and chat workspace (threads, sidebar, file tree).
  */
 
-import type { AgentContextSlashItem, ClaudeChatAttachmentKind } from '../claude-chat-types'
+import type {
+  AgentContextSlashItem,
+  ClaudeChatAttachmentKind,
+  ClaudeFileChangeSetStatus,
+  ClaudeFileDiffFile,
+} from '../claude-chat-types'
 
 /** 顶部主导航视图 / Primary shell view id */
 export type AppViewId = 'home' | 'docs' | 'settings'
@@ -79,8 +84,20 @@ export type ChatActivityItem = {
   preview?: string
 }
 
+/** 会话中的文件 diff 卡片 / File diff card embedded in the transcript */
+export type ChatFileDiffItem = {
+  type: 'file_diff'
+  id: string
+  requestId: string
+  changeSetId: string
+  checkpointId?: string
+  files: ClaudeFileDiffFile[]
+  status: ClaudeFileChangeSetStatus
+  detail?: string
+}
+
 /** 对话时间轴联合类型 / Union of rows shown in the transcript timeline */
-export type TranscriptItem = ChatMessageItem | ChatToolItem | ChatThinkingItem | ChatActivityItem
+export type TranscriptItem = ChatMessageItem | ChatToolItem | ChatThinkingItem | ChatActivityItem | ChatFileDiffItem
 
 /** 单线程内的聊天 UI 状态快照 / Per-thread chat UI state snapshot */
 export type ChatState = {

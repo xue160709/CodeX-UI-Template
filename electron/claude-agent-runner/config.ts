@@ -25,6 +25,7 @@ export function buildSdkEnv(config: ClaudeAgentResolvedConfig): Record<string, s
   const env: Record<string, string | undefined> = {
     ...process.env,
     CLAUDE_AGENT_SDK_CLIENT_APP: 'codex-ui-template/0.0.0',
+    CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1',
   }
 
   if (config.authToken) {

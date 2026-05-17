@@ -1,4 +1,12 @@
 import type {
+  ClaudeFileChangeSetStatus,
+  ClaudeFileDiffFile,
+  ClaudeFileDiffFileStatus,
+  ClaudeFileDiffHunk,
+  ClaudeFileDiffLine,
+  ClaudeFileDiffLineKind,
+} from './claude-chat-types'
+import type {
   ChatMessageAttachment,
   ChatState,
   ChatWorkspaceState,
@@ -302,6 +310,21 @@ function normalizeTranscriptItem(value: unknown): ChatState['items'] {
     ]
   }
 
+  if (value.type === 'file_diff' && typeof value.changeSetId === 'string' && Array.isArray(value.files)) {
+    return [
+      {
+        type: 'file_diff',
+        id: value.id,
+        requestId: typeof value.requestId === 'string' ? value.requestId : '',
+        changeSetId: value.changeSetId,
+        checkpointId: typeof value.checkpointId === 'string' ? value.checkpointId : undefined,
+        files: normalizeFileDiffFiles(value.files),
+        status: normalizeFileChangeSetStatus(value.status),
+        detail: typeof value.detail === 'string' ? value.detail : undefined,
+      },
+    ]
+  }
+
   return []
 }
 
@@ -327,6 +350,67 @@ function normalizeMessageAttachments(value: unknown): ChatMessageAttachment[] | 
     })
     .filter((item): item is ChatMessageAttachment => Boolean(item))
   return attachments.length ? attachments : undefined
+}
+
+function normalizeFileDiffFiles(value: unknown): ClaudeFileDiffFile[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((file): ClaudeFileDiffFile | undefined => {
+      if (!isRecord(file)) return undefined
+      return {
+        path: typeof file.path === 'string' ? file.path : '',
+        relativePath: typeof file.relativePath === 'string' ? file.relativePath : typeof file.path === 'string' ? file.path : '',
+        status: normalizeFileDiffStatus(file.status),
+        additions: toFiniteNumber(file.additions, 0),
+        deletions: toFiniteNumber(file.deletions, 0),
+        hunks: normalizeFileDiffHunks(file.hunks),
+        truncated: file.truncated === true || undefined,
+      }
+    })
+    .filter((file): file is ClaudeFileDiffFile => Boolean(file))
+}
+
+function normalizeFileDiffHunks(value: unknown): ClaudeFileDiffFile['hunks'] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((hunk): ClaudeFileDiffHunk | undefined => {
+      if (!isRecord(hunk) || !Array.isArray(hunk.lines)) return undefined
+      const lines = hunk.lines
+        .map((line): ClaudeFileDiffLine | undefined => {
+          if (!isRecord(line)) return undefined
+          const kind = normalizeFileDiffLineKind(line.kind)
+          return {
+            kind,
+            content: typeof line.content === 'string' ? line.content : '',
+            oldLineNumber: typeof line.oldLineNumber === 'number' ? line.oldLineNumber : undefined,
+            newLineNumber: typeof line.newLineNumber === 'number' ? line.newLineNumber : undefined,
+          }
+        })
+        .filter((line): line is ClaudeFileDiffLine => Boolean(line))
+      return {
+        oldStart: toFiniteNumber(hunk.oldStart, 0),
+        oldLines: toFiniteNumber(hunk.oldLines, 0),
+        newStart: toFiniteNumber(hunk.newStart, 0),
+        newLines: toFiniteNumber(hunk.newLines, 0),
+        lines,
+      }
+    })
+    .filter((hunk): hunk is ClaudeFileDiffHunk => Boolean(hunk))
+}
+
+function normalizeFileChangeSetStatus(value: unknown): ClaudeFileChangeSetStatus {
+  if (value === 'reviewed' || value === 'reverted' || value === 'error') return value
+  return 'captured'
+}
+
+function normalizeFileDiffStatus(value: unknown): ClaudeFileDiffFileStatus {
+  if (value === 'added' || value === 'modified' || value === 'deleted') return value
+  return 'unknown'
+}
+
+function normalizeFileDiffLineKind(value: unknown): ClaudeFileDiffLineKind {
+  if (value === 'add' || value === 'delete') return value
+  return 'context'
 }
 
 function toFiniteNumber(value: unknown, fallback: number): number {

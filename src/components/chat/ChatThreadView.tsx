@@ -6,7 +6,7 @@
 import type { ReactNode, RefObject } from 'react'
 import { IconInline } from '../../icon-inline'
 import { useI18n } from '../../i18n/i18n'
-import type { TranscriptItem } from '../types'
+import type { ChatFileDiffItem, TranscriptItem } from '../types'
 import { Transcript } from './Transcript'
 
 type ChatThreadViewProps = {
@@ -15,6 +15,8 @@ type ChatThreadViewProps = {
   scrollRegionRef: RefObject<HTMLDivElement | null>
   showScrollButton: boolean
   onScrollToBottom: (behavior: ScrollBehavior) => void
+  onReviewFileChanges: (changeSetId: string) => void
+  onRewindFileChanges: (item: ChatFileDiffItem) => void
 }
 
 /** Thread timeline chrome wrapping scroll hints / Timeline chrome around transcript scroll controls */
@@ -24,6 +26,8 @@ export function ChatThreadView({
   scrollRegionRef,
   showScrollButton,
   onScrollToBottom,
+  onReviewFileChanges,
+  onRewindFileChanges,
 }: ChatThreadViewProps) {
   const { t } = useI18n()
 
@@ -31,7 +35,7 @@ export function ChatThreadView({
     <>
       <div className="chat-scroll-region" id="chat-scroll-region" ref={scrollRegionRef}>
         <div className="chat-transcript" id="chat-transcript" aria-live="polite">
-          <Transcript items={items} />
+          <Transcript items={items} onReviewFileChanges={onReviewFileChanges} onRewindFileChanges={onRewindFileChanges} />
         </div>
       </div>
       <button

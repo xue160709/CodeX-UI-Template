@@ -4,10 +4,12 @@
  */
 
 import { memo, useEffect, useMemo, useState } from 'react'
+import { IconInline } from '../../icon-inline'
 import { useI18n } from '../../i18n/i18n'
 import type {
   ActivityStatus,
   ChatActivityItem,
+  ChatFileDiffItem,
   ChatMessageAttachment,
   ChatMessageItem,
   ChatThinkingItem,
@@ -20,13 +22,31 @@ import { formatBytes } from './format'
 import { escapeHtml, renderMarkdown } from './markdown'
 
 /** Memoized transcript map / Memoized transcript list renderer */
-export const Transcript = memo(function Transcript({ items }: { items: TranscriptItem[] }) {
+export const Transcript = memo(function Transcript({
+  items,
+  onReviewFileChanges,
+  onRewindFileChanges,
+}: {
+  items: TranscriptItem[]
+  onReviewFileChanges?: (changeSetId: string) => void
+  onRewindFileChanges?: (item: ChatFileDiffItem) => void
+}) {
   return (
     <>
       {items.map((item) => {
         if (item.type === 'tool') return <ToolRow key={item.id} item={item} />
         if (item.type === 'thinking') return <ThinkingRow key={item.id} item={item} />
         if (item.type === 'activity') return <ActivityRow key={item.id} item={item} />
+        if (item.type === 'file_diff') {
+          return (
+            <FileDiffRow
+              key={item.id}
+              item={item}
+              onReviewFileChanges={onReviewFileChanges}
+              onRewindFileChanges={onRewindFileChanges}
+            />
+          )
+        }
         return <ChatMessage key={item.id} item={item} />
       })}
     </>
@@ -148,6 +168,111 @@ const ActivityRow = memo(function ActivityRow({ item }: { item: ChatActivityItem
       </summary>
       {item.preview ? <pre>{item.preview}</pre> : null}
     </details>
+  )
+})
+
+const FileDiffRow = memo(function FileDiffRow({
+  item,
+  onReviewFileChanges,
+  onRewindFileChanges,
+}: {
+  item: ChatFileDiffItem
+  onReviewFileChanges?: (changeSetId: string) => void
+  onRewindFileChanges?: (item: ChatFileDiffItem) => void
+}) {
+  const { t } = useI18n()
+  const [isOpen, setIsOpen] = useState(item.status === 'captured')
+  const additions = item.files.reduce((sum, file) => sum + file.additions, 0)
+  const deletions = item.files.reduce((sum, file) => sum + file.deletions, 0)
+  const canRewind = Boolean(item.checkpointId && item.status !== 'reverted')
+  const canReview = item.status !== 'reviewed' && item.status !== 'reverted'
+
+  useEffect(() => {
+    if (item.status === 'captured') setIsOpen(true)
+  }, [item.status])
+
+  return (
+    <section className={`file-diff-row file-diff-row--${item.status}`} aria-label={t('chat.fileDiffAria')}>
+      <div className="file-diff-row__header">
+        <span className="file-diff-row__icon" aria-hidden="true">
+          <IconInline name="files" />
+        </span>
+        <div className="file-diff-row__copy">
+          <strong>{t('chat.fileDiffTitle', { count: item.files.length })}</strong>
+          <button type="button" className="file-diff-row__link" onClick={() => setIsOpen((value) => !value)}>
+            {isOpen ? t('chat.fileDiffHide') : t('chat.fileDiffView')}
+          </button>
+          {item.detail ? <span className="file-diff-row__detail">{item.detail}</span> : null}
+        </div>
+        <div className="file-diff-row__stats" aria-label={t('chat.fileDiffStats')}>
+          <span className="file-diff-row__stat file-diff-row__stat--add">+{additions}</span>
+          <span className="file-diff-row__stat file-diff-row__stat--delete">-{deletions}</span>
+        </div>
+        <div className="file-diff-row__actions">
+          <button
+            type="button"
+            className="btn btn-ghost btn-compact"
+            disabled={!canRewind}
+            title={canRewind ? t('chat.fileDiffRevert') : t('chat.fileDiffUnavailable')}
+            onClick={() => onRewindFileChanges?.(item)}
+          >
+            <IconInline name="undo" />
+            <span>{item.status === 'reverted' ? t('chat.fileDiffReverted') : t('chat.fileDiffRevert')}</span>
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary btn-compact"
+            disabled={!canReview}
+            onClick={() => onReviewFileChanges?.(item.changeSetId)}
+          >
+            <IconInline name="check" />
+            <span>{item.status === 'reviewed' ? t('chat.fileDiffReviewed') : t('chat.fileDiffReview')}</span>
+          </button>
+        </div>
+      </div>
+      {isOpen ? (
+        <div className="file-diff-row__body">
+          {item.files.length > 0 ? (
+            item.files.map((file, index) => (
+              <details className="file-diff-file" key={`${file.path}-${index}`} open={index === 0}>
+                <summary className="file-diff-file__summary">
+                  <span>{file.relativePath || file.path}</span>
+                  <span className="file-diff-file__stats">
+                    <span className="file-diff-row__stat file-diff-row__stat--add">+{file.additions}</span>
+                    <span className="file-diff-row__stat file-diff-row__stat--delete">-{file.deletions}</span>
+                  </span>
+                </summary>
+                {file.hunks.length > 0 ? (
+                  <div className="file-diff-file__hunks">
+                    {file.hunks.map((hunk, hunkIndex) => (
+                      <div className="file-diff-hunk" key={`${file.path}-hunk-${hunkIndex}`}>
+                        <div className="file-diff-hunk__meta">
+                          @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
+                        </div>
+                        {hunk.lines.map((line, lineIndex) => (
+                          <div className={`file-diff-line file-diff-line--${line.kind}`} key={`${hunkIndex}-${lineIndex}`}>
+                            <span className="file-diff-line__number">{line.oldLineNumber ?? ''}</span>
+                            <span className="file-diff-line__number">{line.newLineNumber ?? ''}</span>
+                            <code>
+                              {line.kind === 'add' ? '+' : line.kind === 'delete' ? '-' : ' '}
+                              {line.content}
+                            </code>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="file-diff-file__empty">{t('chat.fileDiffEmpty')}</p>
+                )}
+              </details>
+            ))
+          ) : (
+            <p className="file-diff-file__empty">{t('chat.fileDiffEmpty')}</p>
+          )}
+        </div>
+      ) : null}
+    </section>
   )
 })
 

@@ -54,6 +54,10 @@ export const Icons = {
     '<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linejoin="round" d="M5 4h12l2 2v14H5z"/><path stroke-linejoin="round" d="M8 4v6h8V4"/><path stroke-linejoin="round" d="M8 20v-6h8v6"/></svg>',
   refresh:
     '<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20 6v5h-5"/><path stroke-linecap="round" stroke-linejoin="round" d="M4 18v-5h5"/><path stroke-linecap="round" stroke-linejoin="round" d="M18.5 9A7 7 0 006.3 6.7L4 9m2 6a7 7 0 0012.2 2.3L20 15"/></svg>',
+  undo:
+    '<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7H5v4"/><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 11A7 7 0 1112 19"/></svg>',
+  check:
+    '<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.2 4.2L19 7"/></svg>',
   key:
     '<svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M11 12l8-8M17 6l2 2M15 8l2 2"/></svg>',
   server:
