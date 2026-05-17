@@ -1217,6 +1217,16 @@ export const ChatPage = forwardRef<ChatPageHandle, ChatPageProps>(function ChatP
     }
   }
 
+  useEffect(() => {
+    const submitWidgetMessage = (event: Event) => {
+      const text = (event as CustomEvent<{ text?: unknown }>).detail?.text
+      if (typeof text !== 'string' || !text.trim()) return
+      void submitPrompt(text)
+    }
+    window.addEventListener('generative-ui:send-message', submitWidgetMessage)
+    return () => window.removeEventListener('generative-ui:send-message', submitWidgetMessage)
+  })
+
   const copyMessage = useCallback(
     async (text: string) => {
       const ok = await writeClipboardText(text)
