@@ -27,4 +27,8 @@ release
 *.njsproj
 *.sln
 *.sw?
-/.agents
+/.agents/*
+!/.agents/skills/
+/.agents/skills/*
+!/.agents/skills/a2ui-project-home-panel/
+!/.agents/skills/a2ui-project-home-panel/**

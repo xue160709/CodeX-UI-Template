@@ -18,6 +18,8 @@ import type {
   AgentModeStatusResult,
   AppUiLocale,
   DesktopPreferences,
+  HomePluginRunOptions,
+  HomePluginRunResult,
   TrayMenuAction,
 } from '../src/desktop-types'
 import type { ChatWorkspaceState, FileTreeResult } from '../src/components/types'
@@ -59,6 +61,7 @@ declare global {
       listProjectFiles?: (rootPath: string) => Promise<FileTreeResult>
       searchProjectFiles?: (rootPath: string, query: string) => Promise<ProjectFileSearchResult>
       listAgentContext?: (rootPath: string) => Promise<AgentContextResult>
+      runHomePlugin?: (rootPath: string, options?: HomePluginRunOptions) => Promise<HomePluginRunResult>
       getAgentModeStatus?: (rootPath: string, locale?: AppUiLocale) => Promise<AgentModeStatusResult>
       ensureAgentModeFiles?: (rootPath: string, locale?: AppUiLocale) => Promise<AgentModeFilesResult>
       setAgentModeState?: (
@@ -76,6 +79,8 @@ declare global {
       quitApp?: () => Promise<void>
       /** 在访达/资源管理器中展示路径 / Reveal path in Finder or Explorer */
       showItemInFolder?: (targetPath: string) => Promise<void>
+      /** 使用系统默认应用打开路径 / Open path with the system default app */
+      openPath?: (targetPath: string) => Promise<void>
       getDesktopPreferences?: () => Promise<DesktopPreferences>
       setDesktopPreferences?: (partial: Partial<DesktopPreferences>) => Promise<DesktopPreferences>
       syncTrayLocale?: (locale: 'zh' | 'en') => Promise<void>

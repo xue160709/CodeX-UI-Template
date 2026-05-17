@@ -34,6 +34,7 @@ import { ClaudeChatEventCoalescer } from './claude-agent-runner/event-coalescer'
 import { fileDiffFromPostToolUse } from './claude-agent-runner/file-diff'
 import { buildSdkPromptInput, normalizeSubmitAttachments, resolveWorkspaceCwd } from './claude-agent-runner/input'
 import { ClaudeSdkMessageRouter } from './claude-agent-runner/sdk-message-router'
+import { HOME_PLUGIN_CUSTOMIZATION_SYSTEM_PROMPT } from './home-plugin-customization-prompt'
 
 /**
  * 主进程内封装 Claude Agent SDK `query`：会话恢复、权限闸门与事件转发。
@@ -54,6 +55,7 @@ type ActiveRequest = {
   didEmitText: boolean
   didEmitThinking: boolean
   checkpointId?: string
+  promptMode?: ClaudeChatSubmitPayload['promptMode']
   permissionMode: ClaudePermissionMode
   seenToolUseIds: Set<string>
   toolNamesByUseId: Map<string, string>
@@ -63,6 +65,7 @@ type ActiveRequest = {
 
 const READ_ONLY_AUTO_ALLOWED_TOOLS = ['Read', 'Glob', 'Grep', 'ListMcpResources', 'ReadMcpResource']
 const DEFAULT_AGENT_TOOLS = { type: 'preset', preset: 'claude_code' } as const
+const HOME_PLUGIN_CUSTOMIZATION_SKILL = 'a2ui-project-home-panel'
 type PendingPermissionRequest = {
   requestId: string
   toolUseId: string
@@ -151,6 +154,7 @@ export class ClaudeAgentRunner {
       cancelled: false,
       didEmitText: false,
       didEmitThinking: false,
+      promptMode: payload.promptMode === 'home-plugin-customization' ? payload.promptMode : undefined,
       permissionMode: normalizeChatPermissionMode(payload.permissionMode),
       seenToolUseIds: new Set(),
       toolNamesByUseId: new Map(),
@@ -376,7 +380,11 @@ export class ClaudeAgentRunner {
         await this.resolveAgentModeSettings(activeRequest.cwd),
         this.resolveUiLocale(),
       )
-      const resolvedPrompt = await resolvePromptWithContext(prompt, runtimeContext.catalog)
+      const appendSystemPrompt = buildRequestAppendSystemPrompt(activeRequest, runtimeContext.appendSystemPrompt)
+      const resolvedPrompt = await resolvePromptWithContext(prompt, runtimeContext.catalog, {
+        forcedSkillCommand:
+          activeRequest.promptMode === 'home-plugin-customization' ? HOME_PLUGIN_CUSTOMIZATION_SKILL : undefined,
+      })
       const promptInput = buildSdkPromptInput(resolvedPrompt, attachments)
       const sdkEnv = buildSdkEnv(config)
       if (attachments.length > 0) {
@@ -435,8 +443,8 @@ export class ClaudeAgentRunner {
           // otherwise override the model shown in this UI.
           settingSources: [],
           skills: 'all',
-          systemPrompt: runtimeContext.appendSystemPrompt
-            ? { type: 'preset', preset: 'claude_code', append: runtimeContext.appendSystemPrompt }
+          systemPrompt: appendSystemPrompt
+            ? { type: 'preset', preset: 'claude_code', append: appendSystemPrompt }
             : undefined,
           toolConfig: {
             askUserQuestion: { previewFormat: 'markdown' },
@@ -670,6 +678,14 @@ export class ClaudeAgentRunner {
 function joinDetails(parts: Array<string | undefined | null | false>): string | undefined {
   const text = parts.filter((part): part is string => typeof part === 'string' && part.trim().length > 0).join(' · ')
   return text || undefined
+}
+
+function buildRequestAppendSystemPrompt(activeRequest: ActiveRequest, basePrompt?: string): string | undefined {
+  const sections = [basePrompt?.trim()].filter((section): section is string => Boolean(section))
+  if (activeRequest.promptMode === 'home-plugin-customization') {
+    sections.push(HOME_PLUGIN_CUSTOMIZATION_SYSTEM_PROMPT)
+  }
+  return sections.length > 0 ? sections.join('\n\n') : undefined
 }
 
 function previewValue(value: unknown): string {

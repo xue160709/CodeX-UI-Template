@@ -40,6 +40,9 @@ contextBridge.exposeInMainWorld('desktop', {
   listAgentContext(rootPath: string) {
     return ipcRenderer.invoke('desktop:list-agent-context', rootPath)
   },
+  runHomePlugin(rootPath: string, options?: unknown) {
+    return ipcRenderer.invoke('desktop:run-home-plugin', rootPath, options)
+  },
   getAgentModeStatus(rootPath: string, locale?: 'zh' | 'en') {
     return ipcRenderer.invoke('desktop:get-agent-mode-status', rootPath, locale)
   },
@@ -66,6 +69,9 @@ contextBridge.exposeInMainWorld('desktop', {
   },
   showItemInFolder(targetPath: string) {
     return ipcRenderer.invoke('desktop:show-item-in-folder', targetPath) as Promise<void>
+  },
+  openPath(targetPath: string) {
+    return ipcRenderer.invoke('desktop:open-path', targetPath) as Promise<void>
   },
   getDesktopPreferences() {
     return ipcRenderer.invoke('desktop-preferences:get') as Promise<DesktopPreferences>
