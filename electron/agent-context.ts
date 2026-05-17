@@ -19,6 +19,7 @@ import type {
   ProjectFileSearchResult,
 } from '../src/claude-chat-types'
 import type { AgentModeProjectSettings, AppUiLocale } from '../src/desktop-types'
+import { GENERATIVE_UI_SYSTEM_PROMPT } from './generative-ui-prompt'
 import { electronAgentCatalog } from './ui-locale'
 
 type ContextSourceRoot = {
@@ -477,10 +478,10 @@ async function buildAppendSystemPrompt(
   const hasAgentModeSettings =
     agentModeSettings?.enabled === true &&
     (Boolean(agentModeSettings.user.trim()) || Boolean(agentModeSettings.identity.trim()))
-  if (hostInstructionFiles.length === 0 && hostSkills.length === 0 && !hasAgentModeSettings) return undefined
+  const hasHostContext = hostInstructionFiles.length > 0 || hostSkills.length > 0 || hasAgentModeSettings
 
   let remaining = MAX_INSTRUCTION_TOTAL_CHARS
-  const sections = [promptCopy.hostLoadedIntro]
+  const sections = hasHostContext ? [promptCopy.hostLoadedIntro, GENERATIVE_UI_SYSTEM_PROMPT] : [GENERATIVE_UI_SYSTEM_PROMPT]
 
   if (hostSkills.length > 0) {
     sections.push(

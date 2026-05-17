@@ -56,6 +56,8 @@ type ActiveRequest = {
   checkpointId?: string
   permissionMode: ClaudePermissionMode
   seenToolUseIds: Set<string>
+  toolNamesByUseId: Map<string, string>
+  diffedToolUseIds: Set<string>
   streamBlocks: Map<number, StreamBlockState>
 }
 
@@ -151,6 +153,8 @@ export class ClaudeAgentRunner {
       didEmitThinking: false,
       permissionMode: normalizeChatPermissionMode(payload.permissionMode),
       seenToolUseIds: new Set(),
+      toolNamesByUseId: new Map(),
+      diffedToolUseIds: new Set(),
       streamBlocks: new Map(),
     }
 
@@ -488,8 +492,11 @@ export class ClaudeAgentRunner {
 
   private async handlePostToolUseHook(activeRequest: ActiveRequest, input: unknown): Promise<{ continue: true; suppressOutput: true }> {
     try {
+      const toolUseId = isRecord(input) && typeof input.tool_use_id === 'string' ? input.tool_use_id : ''
+      if (toolUseId && activeRequest.diffedToolUseIds.has(toolUseId)) return { continue: true, suppressOutput: true }
       const file = fileDiffFromPostToolUse(input, activeRequest.cwd)
       if (file) {
+        if (toolUseId) activeRequest.diffedToolUseIds.add(toolUseId)
         this.emit({
           type: 'file_diff',
           requestId: activeRequest.requestId,

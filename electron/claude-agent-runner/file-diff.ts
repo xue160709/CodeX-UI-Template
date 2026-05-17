@@ -24,7 +24,11 @@ export function fileDiffFromPostToolUse(input: unknown, cwd: string): ClaudeFile
   const filePath = pickString(response.filePath, response.file_path, toolInput.file_path, toolInput.notebook_path)
   if (!filePath) return undefined
 
-  const hunks = normalizeStructuredPatch(response.structuredPatch)
+  const isCreate = pickString(response.type) === 'create' || response.originalFile === null
+  let hunks = normalizeStructuredPatch(response.structuredPatch)
+  if (hunks.length === 0 && toolName === 'Write' && isCreate && typeof response.content === 'string') {
+    hunks = hunksFromCreatedContent(response.content)
+  }
   if (hunks.length === 0) return undefined
 
   const gitDiff = isRecord(response.gitDiff) ? response.gitDiff : undefined
@@ -40,6 +44,33 @@ export function fileDiffFromPostToolUse(input: unknown, cwd: string): ClaudeFile
     hunks,
     truncated: counted.truncated || undefined,
   }
+}
+
+function hunksFromCreatedContent(content: string): ClaudeFileDiffHunk[] {
+  const rawLines = content.replace(/\r\n/g, '\n').split('\n')
+  if (rawLines[rawLines.length - 1] === '') rawLines.pop()
+  if (rawLines.length === 0) return []
+
+  let truncated = false
+  const visibleLines = rawLines.slice(0, MAX_DIFF_LINES_PER_FILE)
+  if (visibleLines.length < rawLines.length) truncated = true
+
+  const lines: ClaudeFileDiffLine[] = visibleLines.map((line, index) => ({
+    kind: 'add',
+    content: line,
+    newLineNumber: index + 1,
+  }))
+  if (truncated) lines.push({ kind: 'context', content: '... diff truncated ...' })
+
+  return [
+    {
+      oldStart: 0,
+      oldLines: 0,
+      newStart: 1,
+      newLines: rawLines.length,
+      lines,
+    },
+  ]
 }
 
 function normalizeStructuredPatch(value: unknown): ClaudeFileDiffHunk[] {

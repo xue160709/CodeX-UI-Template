@@ -5,6 +5,7 @@
 
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { ClaudeChatEvent } from '../../src/claude-chat-types'
+import { fileDiffFromPostToolUse } from './file-diff'
 
 type ThreadRuntimeState = {
   sessionId?: string
@@ -26,7 +27,10 @@ type ActiveRequest = {
   cwd: string
   didEmitText: boolean
   didEmitThinking: boolean
+  checkpointId?: string
   seenToolUseIds: Set<string>
+  toolNamesByUseId: Map<string, string>
+  diffedToolUseIds: Set<string>
   streamBlocks: Map<number, StreamBlockState>
 }
 
@@ -263,6 +267,7 @@ export class ClaudeSdkMessageRouter {
         status: block.is_error === true ? 'error' : 'done',
         detail: block.is_error === true ? '工具返回错误' : '工具执行完成',
       })
+      this.emitFileDiffFromToolResult(message, block.tool_use_id, activeRequest)
     }
   }
 
@@ -410,6 +415,7 @@ export class ClaudeSdkMessageRouter {
     if (activeRequest.seenToolUseIds.has(toolUseId)) return toolUseId
 
     activeRequest.seenToolUseIds.add(toolUseId)
+    activeRequest.toolNamesByUseId.set(toolUseId, name)
     this.emit({
       type: 'tool_start',
       requestId: activeRequest.requestId,
@@ -418,6 +424,33 @@ export class ClaudeSdkMessageRouter {
       inputPreview: previewValue(block.input),
     })
     return toolUseId
+  }
+
+  private emitFileDiffFromToolResult(
+    message: Extract<SDKMessage, { type: 'user' }>,
+    toolUseId: string,
+    activeRequest: ActiveRequest,
+  ): void {
+    if (activeRequest.diffedToolUseIds.has(toolUseId)) return
+    const toolName = activeRequest.toolNamesByUseId.get(toolUseId) || ''
+    const toolResult = toolUseResultFromMessage(message)
+    const file = fileDiffFromPostToolUse(
+      {
+        tool_name: toolName,
+        tool_response: toolResult,
+      },
+      activeRequest.cwd,
+    )
+    if (!file) return
+
+    activeRequest.diffedToolUseIds.add(toolUseId)
+    this.emit({
+      type: 'file_diff',
+      requestId: activeRequest.requestId,
+      changeSetId: `file-diff-${activeRequest.requestId}`,
+      checkpointId: activeRequest.checkpointId,
+      files: [file],
+    })
   }
 
   private handleStandaloneSdkMessage(message: SDKMessage, activeRequest: ActiveRequest): boolean {
@@ -539,6 +572,12 @@ function getToolName(block: Record<string, unknown>): string {
   if (typeof block.tool_name === 'string') return block.tool_name
   if (typeof block.server_name === 'string') return block.server_name
   return 'Tool'
+}
+
+function toolUseResultFromMessage(message: Extract<SDKMessage, { type: 'user' }>): unknown {
+  const record = message as unknown
+  if (!isRecord(record)) return undefined
+  return record.toolUseResult ?? record.tool_use_result
 }
 
 type ActivityDescriptor = {
@@ -804,4 +843,3 @@ function previewHash(value: unknown): string {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
-

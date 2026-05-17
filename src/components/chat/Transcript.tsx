@@ -19,6 +19,8 @@ import type {
 } from '../types'
 import { AttachmentThumb } from './AttachmentThumb'
 import { formatBytes, formatDuration } from './format'
+import { GenerativeWidget } from './GenerativeWidget'
+import { containsGenerativeWidget, parseGenerativeUiSegments } from './generative-ui'
 import { escapeHtml, renderMarkdown } from './markdown'
 
 /** Memoized transcript map / Memoized transcript list renderer */
@@ -98,15 +100,12 @@ const ChatMessage = memo(function ChatMessage({
   }, [isEditing])
 
   const bodyHtml = useMemo(() => {
-    if (item.role === 'assistant') {
-      return renderMarkdown(item.content || (item.status === 'streaming' ? '' : ' '))
-    }
+    if (item.role === 'assistant') return ''
     return `<p>${escapeHtml(item.content).replace(/\n/g, '<br>')}</p>`
-  }, [item.content, item.role, item.status])
+  }, [item.content, item.role])
 
   if (item.role === 'assistant' && !item.content.trim() && item.status === 'streaming') return null
 
-  const suffix = item.role === 'assistant' && item.status === 'streaming' ? '<span class="typing-dot"></span>' : ''
   const hasBody = item.content.trim().length > 0 || item.role === 'assistant'
   const attachments = item.attachments ?? []
   const durationLabel = item.role === 'assistant' && item.durationMs ? formatDuration(item.durationMs) : ''
@@ -171,7 +170,11 @@ const ChatMessage = memo(function ChatMessage({
               </div>
             </div>
           ) : hasBody ? (
-            <div dangerouslySetInnerHTML={{ __html: bodyHtml + suffix }} />
+            item.role === 'assistant' ? (
+              <AssistantMessageContent content={item.content} status={item.status} />
+            ) : (
+              <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+            )
           ) : null}
         </div>
         {!isEditing ? (
@@ -202,6 +205,64 @@ const ChatMessage = memo(function ChatMessage({
         ) : null}
       </div>
     </article>
+  )
+})
+
+const AssistantMessageContent = memo(function AssistantMessageContent({
+  content,
+  status,
+}: {
+  content: string
+  status: ChatMessageItem['status']
+}) {
+  const { t } = useI18n()
+  const isStreaming = status === 'streaming'
+  const segments = useMemo(
+    () => (containsGenerativeWidget(content) ? parseGenerativeUiSegments(content, isStreaming) : []),
+    [content, isStreaming],
+  )
+
+  if (segments.length === 0) {
+    return (
+      <>
+        <div dangerouslySetInnerHTML={{ __html: renderMarkdown(content || (isStreaming ? '' : ' ')) }} />
+        {isStreaming ? <span className="typing-dot" /> : null}
+      </>
+    )
+  }
+
+  return (
+    <>
+      {segments.map((segment, index) => {
+        if (segment.type === 'text') {
+          return (
+            <div
+              key={`text-${index}`}
+              className="assistant-text-segment"
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(segment.content) }}
+            />
+          )
+        }
+        if (segment.type === 'pending') {
+          return (
+            <div key={`pending-${index}`} className="generative-widget-pending" role="status" aria-live="polite">
+              <span />
+              <strong>{t('chat.generativeUiPreparing')}</strong>
+            </div>
+          )
+        }
+        return (
+          <GenerativeWidget
+            key={`widget-${index}`}
+            widgetCode={segment.data.widgetCode}
+            title={segment.data.title}
+            streaming={isStreaming && segment.data.streaming}
+            showOverlay={segment.data.scriptTruncated}
+          />
+        )
+      })}
+      {isStreaming ? <span className="typing-dot" /> : null}
+    </>
   )
 })
 
