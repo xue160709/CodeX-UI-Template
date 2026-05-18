@@ -1979,8 +1979,8 @@ function playAgentDoneSound(): void {
       oscillator.type = 'sine'
       oscillator.frequency.setValueAtTime(frequency, start)
       gain.gain.setValueAtTime(0.0001, start)
-      gain.gain.exponentialRampToValueAtTime(0.055, start + 0.018)
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18)
+      gain.gain.exponentialRampToValueAtTime(0.12, start + 0.018);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
       oscillator.connect(gain)
       gain.connect(ctx.destination)
       oscillator.start(start)
