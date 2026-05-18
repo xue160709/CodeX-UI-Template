@@ -276,9 +276,12 @@ export async function searchProjectFiles(rootPath: string, query: string): Promi
 async function collectContextSourceRoots(projectRoot: string): Promise<ContextSourceRoot[]> {
   const roots: ContextSourceRoot[] = []
   const projectAncestors = await collectProjectAncestors(projectRoot)
+  const userSourceDirectoryPaths = new Set<string>()
   for (const source of SOURCE_DIRECTORIES) {
+    const directory = path.join(os.homedir(), source.directoryName)
+    userSourceDirectoryPaths.add(normalizeFilesystemPath(directory))
     roots.push({
-      directory: path.join(os.homedir(), source.directoryName),
+      directory,
       projectRoot,
       scope: 'user',
       source: source.source,
@@ -306,8 +309,10 @@ async function collectContextSourceRoots(projectRoot: string): Promise<ContextSo
 
   for (const directory of projectAncestors) {
     for (const source of SOURCE_DIRECTORIES) {
+      const sourceDirectory = path.join(directory, source.directoryName)
+      if (userSourceDirectoryPaths.has(normalizeFilesystemPath(sourceDirectory))) continue
       roots.push({
-        directory: path.join(directory, source.directoryName),
+        directory: sourceDirectory,
         projectRoot,
         scope: 'project',
         source: source.source,
@@ -316,6 +321,10 @@ async function collectContextSourceRoots(projectRoot: string): Promise<ContextSo
   }
 
   return roots
+}
+
+function normalizeFilesystemPath(value: string): string {
+  return path.resolve(value)
 }
 
 async function collectProjectAncestors(projectRoot: string): Promise<string[]> {

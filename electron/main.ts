@@ -321,6 +321,11 @@ function applyLoginItemSettingsFromPrefs(prefs: DesktopPreferences) {
   })
 }
 
+function applyLoginItemSettingsOnStartup(prefs: DesktopPreferences) {
+  if (!prefs.openAtLogin) return
+  applyLoginItemSettingsFromPrefs(prefs)
+}
+
 if (gotSingleInstanceLock) {
   app.on('second-instance', () => {
     if (win && !win.isDestroyed()) {
@@ -362,7 +367,7 @@ if (gotSingleInstanceLock) {
     claudeAgentSettingsStore = new ClaudeAgentSettingsStore(userDataPath)
     agentModeSettingsStore = new AgentModeSettingsStore(userDataPath)
     chatWorkspaceStore = new ChatWorkspaceStore(userDataPath)
-    applyLoginItemSettingsFromPrefs(getDesktopPreferencesStore().read())
+    applyLoginItemSettingsOnStartup(getDesktopPreferencesStore().read())
     currentTrayLocale = normalizeUiLocale(getDesktopPreferencesStore().read().locale)
 
     // --- IPC handlers / IPC 注册 ---
@@ -372,7 +377,9 @@ if (gotSingleInstanceLock) {
     })
     ipcMain.handle('desktop-preferences:set', (_event, partial: Partial<DesktopPreferences>) => {
       const next = getDesktopPreferencesStore().save(partial)
-      applyLoginItemSettingsFromPrefs(next)
+      if (Object.prototype.hasOwnProperty.call(partial, 'openAtLogin')) {
+        applyLoginItemSettingsFromPrefs(next)
+      }
       ensureTray()
       return next
     })
@@ -452,6 +459,10 @@ if (gotSingleInstanceLock) {
     })
     ipcMain.handle('desktop:list-agent-context', (_event, rootPath: string) => {
       return discoverAgentContext(rootPath)
+    })
+    ipcMain.handle('desktop:path-exists-under-project', async (_event, rootPath: unknown, relativePath: unknown) => {
+      if (typeof rootPath !== 'string' || typeof relativePath !== 'string') return false
+      return pathExistsUnderProject(rootPath, relativePath)
     })
     ipcMain.handle('desktop:run-home-plugin', (_event, rootPath: string, options?: HomePluginRunOptions) => {
       return runProjectHomePlugin(rootPath, options)
@@ -710,6 +721,21 @@ function resolveProjectPath(projectPath: string): string {
 
 function normalizeRelativePath(relativePath: string): string {
   return relativePath.split(/[\\/]+/).filter(Boolean).join('/')
+}
+
+async function pathExistsUnderProject(rootPath: string, relativePath: string): Promise<boolean> {
+  const resolvedRoot = resolveProjectPath(rootPath)
+  const normalized = normalizeRelativePath(relativePath)
+  if (!normalized || normalized.split('/').some((segment) => segment === '..')) return false
+  const resolvedTarget = path.resolve(resolvedRoot, ...normalized.split('/'))
+  const rel = path.relative(resolvedRoot, resolvedTarget)
+  if (rel.startsWith('..') || path.isAbsolute(rel)) return false
+  try {
+    await fs.access(resolvedTarget)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function shouldIgnoreFileTreeEntry(entry: import('node:fs').Dirent): boolean {
